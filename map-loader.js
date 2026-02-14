@@ -262,6 +262,7 @@ function initMapLoader() {
     const resetMap = document.getElementById('reset-map');
     const mapNameEl = document.getElementById('current-map-name');
 
+
     // Update map name display on load
     var customStadiumData = localStorage.getItem('customStadium');
     if (customStadiumData && mapNameEl) {
