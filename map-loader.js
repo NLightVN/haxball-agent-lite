@@ -163,13 +163,18 @@ function resetGameWithNewMap() {
     // Clear old discs
     discs = [];
 
-    // Recreate ball at center
+    // Recreate ball at center with FULL initialization
     var ballDisc = new Disc();
-    ballDisc.ballPhysics();
+    ballDisc.ballPhysics(); // Sets default ball physics
     ballDisc.x = 0;
     ballDisc.y = 0;
     ballDisc.xspeed = 0;
     ballDisc.yspeed = 0;
+
+    // CRITICAL: Set collision flags so ball is visible and interacts
+    ballDisc.cMask = haxball.collisionFlags.all;
+    ballDisc.cGroup = haxball.collisionFlags.ball;
+
     // Apply custom ball physics from stadium if specified
     if (stadium.ballPhysics) {
         if (stadium.ballPhysics.radius) ballDisc.radius = stadium.ballPhysics.radius;
@@ -177,8 +182,15 @@ function resetGameWithNewMap() {
         if (stadium.ballPhysics.invMass !== undefined) ballDisc.invMass = stadium.ballPhysics.invMass;
         if (stadium.ballPhysics.damping !== undefined) ballDisc.damping = stadium.ballPhysics.damping;
     }
+
     discs.push(ballDisc);
-    console.log(`⚽ Ball created at (${ballDisc.x}, ${ballDisc.y}) with radius ${ballDisc.radius}`);
+    console.log(`⚽ Ball created:`, {
+        position: `(${ballDisc.x}, ${ballDisc.y})`,
+        radius: ballDisc.radius,
+        cMask: ballDisc.cMask,
+        cGroup: ballDisc.cGroup,
+        invMass: ballDisc.invMass
+    });
 
     // Add stadium discs (goal posts, etc.)
     if (stadium.discs) {
@@ -235,10 +247,11 @@ function resetGameWithNewMap() {
         load_tile(stadium.bg.type);
     }
 
-    // Re-render
+    // Re-render with new stadium
     render(stadium);
 
     console.log('✅ Game reset complete');
+    console.log(`   Stadium: ${stadium.width}x${stadium.height}`);
     console.log(`   Players active: ${playersArray.length}`);
     console.log(`   Discs: ${discs.length}`);
 }
