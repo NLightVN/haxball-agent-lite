@@ -1405,6 +1405,8 @@ function draw() {
         }
     }
 
+    render(stadium); // CRITICAL: Render stadium geometry (field lines, goals, etc.)
+
     updateBar();
     resize_canvas();
 }
