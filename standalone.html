@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haxball Agent Lite - Standalone</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            font-size: 1.5em;
+            margin-top: 30px;
+        }
+
+        code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+
+        pre {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .step {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .button {
+            display: inline-block;
+            background: rgba(76, 175, 80, 0.3);
+            border: 2px solid rgba(76, 175, 80, 0.6);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            margin: 10px 10px 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .button:hover {
+            background: rgba(76, 175, 80, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .warning {
+            background: rgba(255, 152, 0, 0.2);
+            border-left: 4px solid #FF9800;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        #copyBtn {
+            background: rgba(33, 150, 243, 0.3);
+            border-color: rgba(33, 150, 243, 0.6);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>⚽ Haxball Agent Lite - Standalone Setup</h1>
+        <p style="font-size: 1.1em; opacity: 0.9;">
+            Vì CORS restrictions, game không thể chạy trong iframe từ file://.
+            Hãy làm theo hướng dẫn dưới đây để chạy game.
+        </p>
+    </div>
+
+    <div class="card">
+        <h2>🚀 Cách 1: Chạy với Local Server (Khuyến nghị)</h2>
+
+        <div class="step">
+            <strong>Bước 1:</strong> Mở Terminal/Command Prompt
+        </div>
+
+        <div class="step">
+            <strong>Bước 2:</strong> Chạy lệnh sau:
+            <pre>cd "e:\Tran Quang Hung\Personal Project\haxball-agent-lite"
+npm install
+npm start</pre>
+        </div>
+
+        <div class="step">
+            <strong>Bước 3:</strong> Mở browser và vào:
+            <pre>http://localhost:8080</pre>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🎮 Cách 2: Chạy trực tiếp trên Haxball.com (Đơn giản nhất)</h2>
+
+        <div class="step">
+            <strong>Bước 1:</strong> Click nút này để mở Haxball Headless:
+            <br><br>
+            <a href="https://www.haxball.com/headless" target="_blank" class="button">
+                🌐 Mở Haxball Headless
+            </a>
+        </div>
+
+        <div class="step">
+            <strong>Bước 2:</strong> Mở Developer Console (F12) → tab Console
+        </div>
+
+        <div class="step">
+            <strong>Bước 3:</strong> Copy script dưới đây và paste vào Console, rồi Enter:
+            <button id="copyBtn" class="button" onclick="copyScript()">📋 Copy Script</button>
+            <pre id="gameScript">// Haxball Agent Lite - Standalone Version
+(function() {
+    console.log('🎮 Initializing Haxball Agent Lite...');
+    
+    // Room configuration
+    const room = HBInit({
+        roomName: "Haxball Agent Lite - 2P Local",
+        playerName: "Player 1",
+        maxPlayers: 2,
+        public: false,
+        noPlayer: false
+    });
+    
+    // Set classic stadium
+    room.setDefaultStadium("Classic");
+    room.setScoreLimit(3);
+    room.setTimeLimit(3);
+    
+    // Auto team assignment
+    room.onPlayerJoin = function(player) {
+        console.log('✅ ' + player.name + ' joined');
+        
+        if (player.id === 1) {
+            room.setPlayerTeam(player.id, 1); // Red
+        } else if (player.id === 2) {
+            room.setPlayerTeam(player.id, 2); // Blue
+        }
+        
+        const players = room.getPlayerList();
+        if (players.length === 2) {
+            room.startGame();
+            console.log('🎮 Game started!');
+        }
+    };
+    
+    room.onTeamGoal = function(team) {
+        const scores = room.getScores();
+        console.log('⚽ Goal! Score: Red ' + scores.red + ' - ' + scores.blue + ' Blue');
+    };
+    
+    room.onGameStart = function() {
+        console.log('▶️ Game started');
+    };
+    
+    room.onGameStop = function() {
+        const scores = room.getScores();
+        console.log('⏹️ Game stopped. Final: ' + scores.red + ' - ' + scores.blue);
+    };
+    
+    // Agent API
+    window.GameAPI = {
+        room: room,
+        agentEnabled: false,
+        
+        getState: function() {
+            const players = room.getPlayerList();
+            const scores = room.getScores();
+            const ball = room.getDiscProperties(0);
+            
+            return {
+                ball: ball,
+                players: players.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    team: p.team,
+                    position: p.position,
+                    disc: room.getPlayerDiscProperties(p.id)
+                })),
+                score: scores
+            };
+        },
+        
+        setAgentInput: function(input) {
+            // Implementation for bot control
+            window.agentInput = input;
+        }
+    };
+    
+    // Simple AI Bot
+    class SimpleBot {
+        constructor() {
+            this.interval = null;
+        }
+        
+        start() {
+            console.log('🤖 AI Bot started');
+            this.interval = setInterval(() => this.update(), 1000/60);
+        }
+        
+        stop() {
+            clearInterval(this.interval);
+            console.log('🤖 AI Bot stopped');
+        }
+        
+        update() {
+            const state = GameAPI.getState();
+            if (!state) return;
+            
+            const me = state.players.find(p => p.team === 2);
+            if (!me || !me.disc) return;
+            
+            const ball = state.ball;
+            if (!ball) return;
+            
+            // Simple chase logic
+            const dx = ball.x - me.disc.x;
+            const dy = ball.y - me.disc.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            const input = {
+                left: dx < -5,
+                right: dx > 5,
+                up: dy < -5,
+                down: dy > 5,
+                kick: dist < 25 && ball.x > me.disc.x
+            };
+            
+            GameAPI.setAgentInput(input);
+        }
+    }
+    
+    window.bot = new SimpleBot();
+    
+    console.log('✅ Haxball Agent Lite loaded!');
+    console.log('📝 Commands:');
+    console.log('  bot.start()  - Start AI bot (Player 2)');
+    console.log('  bot.stop()   - Stop AI bot');
+    console.log('  GameAPI.getState() - Get game state');
+    console.log('');
+    console.log('🎮 Controls:');
+    console.log('  Player 1: ↑↓←→ + X');
+    console.log('  Player 2: Use bot.start() or join from link');
+})();
+</pre>
+        </div>
+
+        <div class="step">
+            <strong>Bước 4:</strong> Chơi!
+            <ul>
+                <li>Player 1 control bằng keyboard: ↑↓←→ + X</li>
+                <li>Để bật AI bot cho Player 2, gõ: <code>bot.start()</code></li>
+                <li>Xem game state: <code>GameAPI.getState()</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🎯 Controls</h2>
+
+        <strong>Player 1:</strong>
+        <ul>
+            <li>↑ ↓ ← → - Di chuyển</li>
+            <li>X - Kick</li>
+        </ul>
+
+        <strong>Player 2 (AI Bot):</strong>
+        <ul>
+            <li>Gõ trong Console: <code>bot.start()</code></li>
+            <li>Dừng bot: <code>bot.stop()</code></li>
+        </ul>
+    </div>
+
+    <div class="card warning">
+        <h2>⚠️ Lưu ý</h2>
+        <ul>
+            <li>Tab phải luôn mở để game chạy</li>
+            <li>Nếu reload trang, phải paste script lại</li>
+            <li>Để develop bot nâng cao, dùng Cách 1 với local server</li>
+        </ul>
+    </div>
+
+    <script>
+        function copyScript() {
+            const script = document.getElementById('gameScript').textContent;
+            navigator.clipboard.writeText(script).then(() => {
+                const btn = document.getElementById('copyBtn');
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    btn.textContent = '📋 Copy Script';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+
+</html>
