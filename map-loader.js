@@ -302,6 +302,50 @@ function initMapLoader() {
     } else {
         console.warn('⚠️ Reset map element not found');
     }
+
+    const clearStorage = document.getElementById('clear-storage');
+    if (clearStorage) {
+        clearStorage.addEventListener('click', function () {
+            console.log('🗑️ Clearing all custom stadium data from localStorage');
+
+            // Clear all custom data
+            localStorage.removeItem('customStadium');
+            localStorage.removeItem('customBallPhysics');
+            localStorage.removeItem('customPlayerPhysics');
+
+            alert('✅ Storage cleared! Page will reload with Classic map.');
+
+            // Reload page
+            location.reload();
+        });
+        console.log('✅ Clear storage listener attached');
+    } else {
+        console.warn('⚠️ Clear storage element not found');
+    }
+
+    // DIAGNOSTIC: Check for corrupt stadium data on page load
+    if (customStadiumData) {
+        try {
+            var stadium = JSON.parse(customStadiumData);
+            console.log('📊 Stadium Diagnostic:');
+            console.log(`   Name: ${stadium.name}`);
+            console.log(`   Size: ${stadium.width}x${stadium.height}`);
+            console.log(`   Segments: ${stadium.segments ? stadium.segments.length : 0}`);
+            console.log(`   Vertexes: ${stadium.vertexes ? stadium.vertexes.length : 0}`);
+            console.log(`   Traits: ${stadium.traits ? Object.keys(stadium.traits).length : 0}`);
+
+            // Check for suspicious patterns
+            if (stadium.name && (stadium.name.includes('[') || stadium.segments && stadium.segments.length > 50)) {
+                console.warn('⚠️ WARNING: Stadium may be corrupt!');
+                console.warn(`   Unusual name: "${stadium.name}"`);
+                console.warn(`   Unusual segment count: ${stadium.segments ? stadium.segments.length : 0}`);
+                console.warn('   💡 TIP: Click "Clear Storage" if map doesn\'t render properly');
+            }
+        } catch (e) {
+            console.error('❌ Corrupt stadium data detected in localStorage!');
+            console.error('   Click "Clear Storage" to fix this issue');
+        }
+    }
 }
 
 // Initialize when DOM is ready

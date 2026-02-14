@@ -1441,6 +1441,7 @@ function normalise(v) {
 }
 
 function render(st) {
+    console.log('🎨 render() called with stadium:', st ? st.name : 'undefined');
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(
         0,
@@ -1460,8 +1461,11 @@ function render(st) {
 
     renderbg(st, ctx);
 
+    console.log(`📊 Rendering ${segments.length} segments`);
+    var visibleCount = 0;
     segments.forEach((segment) => {
         if (segment.vis) {
+            visibleCount++;
             ctx.beginPath();
             ctx.lineWidth = 3;
             ctx.strokeStyle = color_to_style(
@@ -1488,6 +1492,10 @@ function render(st) {
             ctx.stroke();
         }
     });
+    console.log(`✅ Rendered ${visibleCount} visible segments out of ${segments.length}`);
+    if (visibleCount === 0) {
+        console.warn('⚠️ WARNING: No segments are visible! Check segment.vis property');
+    }
 
     drawPlayerDiscExtLine(playersArray[0]);
 
