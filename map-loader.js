@@ -47,36 +47,24 @@ function validateAndApplyMap(mapData) {
 
     console.log(`✅ Map validation passed: ${mapData.name}`);
 
-    // CRITICAL: Process stadium structure BEFORE assigning globally
-    console.log('🔧 Processing stadium structure...');
-    processStadiumStructure(mapData);
+    // CRITICAL: Save to localStorage and reload page
+    // This is necessary because script.js caches stadium structure on init
+    // Simply changing the global variable doesn't update the cached data
+    console.log('💾 Saving stadium to localStorage...');
+    localStorage.setItem('customStadium', JSON.stringify(mapData));
 
-    // Now assign to global stadium variable
-    stadium = mapData;
-    console.log(`📍 Stadium variable updated to: ${stadium.name}`);
-
-    // Apply custom physics if specified
+    // Apply custom physics to localStorage as well
     if (mapData.ballPhysics) {
-        console.log('⚙️ Applying custom ball physics');
-        Object.assign(haxball.ballPhysics, mapData.ballPhysics);
+        localStorage.setItem('customBallPhysics', JSON.stringify(mapData.ballPhysics));
     }
     if (mapData.playerPhysics) {
-        console.log('⚙️ Applying custom player physics');
-        Object.assign(haxball.playerPhysics, mapData.playerPhysics);
+        localStorage.setItem('customPlayerPhysics', JSON.stringify(mapData.playerPhysics));
     }
 
-    // Reset game with new map
-    resetGameWithNewMap();
+    console.log('🔄 Reloading page to apply new stadium...');
 
-    // Update UI
-    const mapNameEl = document.getElementById('current-map-name');
-    if (mapNameEl) {
-        mapNameEl.textContent = mapData.name;
-    }
-
-    console.log(`🎮 Successfully loaded map: ${mapData.name}`);
-    console.log(`   Dimensions: ${mapData.width} x ${mapData.height}`);
-    console.log(`   Vertexes: ${mapData.vertexes.length}, Segments: ${mapData.segments.length}`);
+    // Reload page to re-initialize with new stadium
+    location.reload();
 }
 
 /**
@@ -266,9 +254,24 @@ function resetGameWithNewMap() {
 /**
  * Initialize map loader event listeners
  */
+/**
+ * Initialize map loader event listeners and UI
+ */
 function initMapLoader() {
     const mapUpload = document.getElementById('map-upload');
     const resetMap = document.getElementById('reset-map');
+    const mapNameEl = document.getElementById('current-map-name');
+
+    // Update map name display on load
+    var customStadiumData = localStorage.getItem('customStadium');
+    if (customStadiumData && mapNameEl) {
+        try {
+            var customStadium = JSON.parse(customStadiumData);
+            mapNameEl.textContent = customStadium.name || 'Custom';
+        } catch (e) {
+            console.error('Failed to parse custom stadium name:', e);
+        }
+    }
 
     if (mapUpload) {
         mapUpload.addEventListener('change', function (e) {
@@ -287,6 +290,11 @@ function initMapLoader() {
     if (resetMap) {
         resetMap.addEventListener('click', function () {
             console.log('🔄 Resetting to Classic map');
+            // Clear custom stadium from localStorage
+            localStorage.removeItem('customStadium');
+            localStorage.removeItem('customBallPhysics');
+            localStorage.removeItem('customPlayerPhysics');
+            // Reload page
             location.reload();
         });
         console.log('✅ Reset map listener attached');
