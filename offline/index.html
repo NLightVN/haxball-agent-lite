@@ -3,9 +3,6 @@
 
 <head>
     <link href="style.css" rel="stylesheet" type="text/css">
-    <script src="https://code.jquery.com/jquery-3.4.1.min.js" crossorigin="anonymous"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js" crossorigin="anonymous"></script>
-    <script src="msgpack.min.js"></script>
     <title>Haxball Agent Lite</title>
 </head>
 
@@ -30,10 +27,13 @@
         </div>
     </div>
     <canvas id="canvas_div"></canvas>
-    <script src="bot.js"></script>
-    <script src="script.js"></script>
-    <script src="agent-api.js"></script>
-    <script src="enhanced-bot.js"></script>
+
+    <!-- Scripts with defer to ensure DOM is ready -->
+    <script defer src="msgpack.min.js"></script>
+    <script defer src="bot.js"></script>
+    <script defer src="script.js"></script>
+    <script defer src="agent-api.js"></script>
+    <script defer src="enhanced-bot.js"></script>
 </body>
 
 </html>

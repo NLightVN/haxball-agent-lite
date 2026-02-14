@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link href="style.css" rel="stylesheet" type="text/css">
+    <title>Haxball Agent Lite</title>
+</head>
+
+<body>
+    <div class="bar-container">
+        <div class="bar">
+            <div class="scoreboard">
+                <div class="teamicon red"></div>
+                <div class="score" data-hook="red-score">0</div>
+                <div>-</div>
+                <div class="score" data-hook="blue-score">0</div>
+                <div class="teamicon blue"></div>
+            </div>
+            <div class="game-timer-view">
+                <span class="overtime">OVERTIME!</span>
+                <span class="digit">0</span>
+                <span class="digit">0</span>
+                <span class="null">:</span>
+                <span class="digit">0</span>
+                <span class="digit">0</span>
+            </div>
+        </div>
+    </div>
+    <canvas id="canvas_div"></canvas>
+
+    <!-- Load scripts in order -->
+    <script>
+        console.log('=== LOADING GAME ===');
+        console.log('1. HTML loaded');
+    </script>
+    <script src="msgpack.min.js" onload="console.log('2. msgpack loaded')"
+        onerror="console.error('ERROR: msgpack failed')"></script>
+    <script src="bot.js" onload="console.log('3. bot.js loaded')"
+        onerror="console.error('ERROR: bot.js failed')"></script>
+    <script src="script.js" onload="console.log('4. script.js loaded - GAME SHOULD START')"
+        onerror="console.error('ERROR: script.js failed')"></script>
+    <script src="agent-api.js" onload="console.log('5. agent-api loaded')"
+        onerror="console.error('ERROR: agent-api failed')"></script>
+    <script src="enhanced-bot.js" onload="console.log('6. enhanced-bot loaded')"
+        onerror="console.error('ERROR: enhanced-bot failed')"></script>
+    <script>
+        console.log('=== ALL SCRIPTS LOADED ===');
+        setTimeout(() => {
+            console.log('Canvas:', document.getElementById('canvas_div'));
+            console.log('Players:', typeof playersArray !== 'undefined' ? playersArray.length : 'UNDEFINED');
+        }, 1000);
+    </script>
+</body>
+
+</html>

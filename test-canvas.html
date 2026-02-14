@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Test Canvas</title>
+</head>
+
+<body>
+    <h1>Test Basic Canvas</h1>
+    <canvas id="canvas_div" width="800" height="600" style="border: 1px solid black;"></canvas>
+
+    <script>
+        console.log('Script loading...');
+        var canvas = document.getElementById('canvas_div');
+        console.log('Canvas element:', canvas);
+        var ctx = canvas.getContext('2d');
+        console.log('Context:', ctx);
+
+        // Draw test
+        ctx.fillStyle = 'green';
+        ctx.fillRect(0, 0, 800, 600);
+        ctx.fillStyle = 'white';
+        ctx.fillText('TEST - Canvas Working!', 100, 100);
+
+        console.log('Canvas drawn successfully!');
+    </script>
+</body>
+
+</html>
