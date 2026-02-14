@@ -359,13 +359,13 @@ var scorableDiscsPos = (function () {
 document.addEventListener('keydown', keyDownHandler, false);
 document.addEventListener('keyup', keyUpHandler, false);
 
-var myEl = document.getElementById('load_last');
-myEl.addEventListener('click', watchLastGame, false);
+// var myEl = document.getElementById('load_last');
+// myEl.addEventListener('click', watchLastGame, false);
 
-var input = document.getElementById('input');
-input.addEventListener('change', handleFile, false);
+// var input = document.getElementById('input');
+// input.addEventListener('change', handleFile, false);
 var fileread = new FileReader();
-fileread.addEventListener('loadend', loadFileRec, false);
+// fileread.addEventListener('loadend', loadFileRec, false);
 
 var recCheck =
     (localStorage.getItem('rec') === '1' &&

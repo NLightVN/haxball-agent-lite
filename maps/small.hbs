@@ -1,0 +1,108 @@
+{
+"name": "Small Arena",
+"width": 280,
+"height": 140,
+"spawnDistance": 180,
+"bg": {
+"type": "grass",
+"width": 250,
+"height": 120,
+"kickOffRadius": 50,
+"cornerRadius": 0
+},
+"ballPhysics": {
+"radius": 8,
+"bCoef": 0.6,
+"invMass": 1.1,
+"damping": 0.98
+},
+"playerPhysics": {
+"radius": 12,
+"bCoef": 0.5,
+"invMass": 0.5,
+"damping": 0.95,
+"acceleration": 0.15,
+"kickingAcceleration": 0.1,
+"kickingDamping": 0.95,
+"kickStrength": 4
+},
+"vertexes": [
+{"x": -250, "y": 120, "trait": "ballArea"},
+{"x": -250, "y": 50, "trait": "ballArea"},
+{"x": -250, "y": -50, "trait": "ballArea"},
+{"x": -250, "y": -120, "trait": "ballArea"},
+{"x": 250, "y": 120, "trait": "ballArea"},
+{"x": 250, "y": 50, "trait": "ballArea"},
+{"x": 250, "y": -50, "trait": "ballArea"},
+{"x": 250, "y": -120, "trait": "ballArea"},
+{"x": 0, "y": 140, "trait": "kickOffBarrier"},
+{"x": 0, "y": 50, "trait": "kickOffBarrier"},
+{"x": 0, "y": -50, "trait": "kickOffBarrier"},
+{"x": 0, "y": -140, "trait": "kickOffBarrier"},
+{"x": -260, "y": -50, "trait": "goalNet"},
+{"x": -280, "y": -35, "trait": "goalNet"},
+{"x": -280, "y": 35, "trait": "goalNet"},
+{"x": -260, "y": 50, "trait": "goalNet"},
+{"x": 260, "y": -50, "trait": "goalNet"},
+{"x": 280, "y": -35, "trait": "goalNet"},
+{"x": 280, "y": 35, "trait": "goalNet"},
+{"x": 260, "y": 50, "trait": "goalNet"}
+],
+"segments": [
+{"v0": 0, "v1": 1, "trait": "ballArea"},
+{"v0": 2, "v1": 3, "trait": "ballArea"},
+{"v0": 4, "v1": 5, "trait": "ballArea"},
+{"v0": 6, "v1": 7, "trait": "ballArea"},
+{"v0": 12, "v1": 13, "trait": "goalNet", "curve": -90},
+{"v0": 13, "v1": 14, "trait": "goalNet"},
+{"v0": 14, "v1": 15, "trait": "goalNet", "curve": -90},
+{"v0": 16, "v1": 17, "trait": "goalNet", "curve": 90},
+{"v0": 17, "v1": 18, "trait": "goalNet"},
+{"v0": 18, "v1": 19, "trait": "goalNet", "curve": 90},
+{"v0": 8, "v1": 9, "trait": "kickOffBarrier"},
+{"v0": 9, "v1": 10, "trait": "kickOffBarrier", "curve": 180, "cGroup": ["blueKO"]},
+{"v0": 9, "v1": 10, "trait": "kickOffBarrier", "curve": -180, "cGroup": ["redKO"]},
+{"v0": 10, "v1": 11, "trait": "kickOffBarrier"}
+],
+"goals": [
+{"p0": [-250, 50], "p1": [-250, -50], "team": "red"},
+{"p0": [250, 50], "p1": [250, -50], "team": "blue"}
+],
+"discs": [
+{"pos": [-250, 50], "trait": "goalPost", "color": "FFCCCC"},
+{"pos": [-250, -50], "trait": "goalPost", "color": "FFCCCC"},
+{"pos": [250, 50], "trait": "goalPost", "color": "CCCCFF"},
+{"pos": [250, -50], "trait": "goalPost", "color": "CCCCFF"}
+],
+"planes": [
+{"normal": [0, 1], "dist": -120, "trait": "ballArea"},
+{"normal": [0, -1], "dist": -120, "trait": "ballArea"},
+{"normal": [0, 1], "dist": -140, "bCoef": 0.1},
+{"normal": [0, -1], "dist": -140, "bCoef": 0.1},
+{"normal": [1, 0], "dist": -280, "bCoef": 0.1},
+{"normal": [-1, 0], "dist": -280, "bCoef": 0.1}
+],
+"traits": {
+"ballArea": {
+"vis": false,
+"bCoef": 1,
+"cMask": ["ball"]
+},
+"goalPost": {
+"radius": 6,
+"invMass": 0,
+"bCoef": 0.5
+},
+"goalNet": {
+"vis": true,
+"bCoef": 0.1,
+"cMask": ["ball"]
+},
+"kickOffBarrier": {
+"vis": false,
+"bCoef": 0.1,
+"cGroup": ["redKO", "blueKO"],
+"cMask": ["red", "blue"]
+}
+}
+}

@@ -118,21 +118,53 @@ canvas {
     z-index:1
 }
 
-input {
-    cursor: pointer;
-    left: 0%;
-}
-
-#load_last {
+/* Map Loader Styles */
+.map-loader-container {
     position: absolute;
-    right: 0%;
-    z-index: 1;
+    bottom: 10px;
+    left: 10px;
+    z-index: 2;
 }
 
-.upload-btn-wrapper {
-  position: absolute;
-  overflow: hidden;
-  z-index: 1;
+.map-loader {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: rgba(26, 33, 37, 0.9);
+    padding: 10px 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.map-btn {
+    border: 2px solid #4a5f7a;
+    color: white;
+    background-color: #2d3e50;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.map-btn:hover {
+    background-color: #3d4e60;
+    border-color: #5a7fa0;
+    transform: translateY(-1px);
+}
+
+.map-btn:active {
+    transform: translateY(0);
+}
+
+.map-name {
+    color: #90cdf4;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 0 8px;
+    min-width: 80px;
+    text-align: center;
 }
 
 .btn {
@@ -143,14 +175,5 @@ input {
   border-radius: 8px;
   font-size: 20px;
   font-weight: bold;
-  cursor: pointer;
-}
-
-.upload-btn-wrapper input[type=file] {
-  font-size: 100px;
-  position: absolute;
-  left: 0;
-  top: 0;
-  opacity: 0;
   cursor: pointer;
 }
