@@ -1,5 +1,8 @@
-node_modules/
-.DS_Store
-*.log
+__pycache__/
+rec_py.hbr
+recordings/
+recording_native.js
+game_min_dev.js
+recordings/
 .vscode/
-dist/
+bash.exe.stackdump

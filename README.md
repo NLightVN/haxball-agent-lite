@@ -1,89 +1,132 @@
-# Haxball Agent Lite
+# Haxball Agent Lite ⚽🤖
 
-Offline 2-player Haxball game using the official Haxball Headless API, designed for AI agent development and testing.
+**Fully offline 2-player Haxball with Agent API for AI bot development**
 
-## Features
+Based on [Wazarr94's Haxball Clone](https://github.com/Wazarr94/Wazarr94.github.io) - **authentic Haxball physics!**
 
-- ✅ **Authentic Haxball physics** - Uses official Haxball Headless API
-- ✅ **2-player local gameplay** - Play on the same computer
-- ✅ **Classic maps** - Includes official Haxball stadiums
-- ✅ **Customizable controls** - Configure keyboard bindings
-- ✅ **Agent-ready** - Built-in API for AI bot development
+---
 
-## Quick Start
+## 🚀 Quick Start
 
-### Option 1: Open in Browser (Recommended for testing)
+1. **Open `index.html`** in your browser
+2. Game starts immediately with 2 players!
+3. **Press F12** → Console to use Agent API
 
-1. Open `index.html` in your browser
-2. The game will load automatically
-3. Player 1 uses **W, A, S, D, Space**
-4. Player 2 uses **Arrow keys, Enter**
+No server, no dependencies, 100% offline!
 
-### Option 2: Run with Local Server
+---
 
-```bash
-npm install
-npm start
-```
+## 🎮 Controls
 
-Then open http://localhost:8080
+| Player | Team | Controls |
+|--------|------|----------|
+| **Player 1** | 🔴 Red | **WASD** + **Space** |
+| **Player 2** | 🔵 Blue | **Arrow Keys** + **X** |
 
-## Controls
+---
 
-### Player 1 (Red Team)
-- **W** - Move up
-- **A** - Move left
-- **S** - Move down
-- **D** - Move right
-- **Space** - Kick
+## 🤖 Agent API
 
-### Player 2 (Blue Team)
-- **↑** - Move up
-- **←** - Move left
-- **↓** - Move down
-- **→** - Move right
-- **Enter** - Kick
-
-## AI Agent Development
-
-The game exposes a simple API for creating AI agents:
+### Get Game State
 
 ```javascript
-// Get current game state
-const state = GameAPI.getState();
-// Returns: { ball: {x, y, xspeed, yspeed}, players: [...], score: {...} }
+const state = AgentAPI.getState();
+// Returns: {ball, players, score, stadium, frame}
+```
 
-// Control agent (Player 2)
-GameAPI.setAgentInput({
-    up: true,
+### Control a Player
+
+```javascript
+AgentAPI.setPlayerInput(0, {
+    up: false,
     down: false,
-    left: false,
-    right: true,
-    kick: false
+    left: true,
+    right: false,
+    kick: true
 });
 ```
 
-See `src/agent/example-bot.js` for a simple AI implementation.
+### Create a Bot
 
-## Project Structure
+```javascript
+const bot = new EnhancedBot(1); // Control Player 2
+setInterval(() => bot.update(), 1000/60); // Run at 60 FPS
+```
+
+---
+
+## 📚 Full Documentation
+
+See [`README_FULL.md`](offline/README.md) for:
+- Complete API documentation
+- Advanced bot examples
+- Physics constants
+- Custom stadium creation
+
+---
+
+## 📁 Project Structure
 
 ```
 haxball-agent-lite/
-├── index.html              # Main HTML wrapper
-├── src/
-│   ├── game.js            # Game initialization & controls
-│   ├── maps/              # Stadium definitions
-│   │   └── classic.js     # Classic Haxball map
-│   └── agent/             # AI agent interface
-│       ├── agent-api.js   # Agent API
-│       └── example-bot.js # Example AI bot
-└── README.md
+├── index.html          # Main game (LITE version)
+├── script.js           # Physics engine (86KB - authentic!)
+├── bot.js              # Original bot functions
+├── agent-api.js        # Agent API wrapper
+├── enhanced-bot.js     # Example AI bot
+├── style.css, audio/   # Assets
+│
+├── offline/            # Original offline version
+├── legacy/             # Old experimental versions
+└── README.md           # This file
 ```
 
-## How It Works
+---
 
-This project uses the [Haxball Headless Host API](https://github.com/haxball/haxball-issues/wiki/Headless-Host) to create a local game room that runs entirely in your browser. The physics engine, rendering, and game logic are all provided by the official Haxball implementation.
+## ✨ Features
 
-## License
+✅ **100% Offline** - No internet required  
+✅ **Authentic Physics** - Same as original Haxball  
+✅ **Full Agent API** - Complete game state access  
+✅ **Easy Bot Development** - Simple JavaScript interface  
+✅ **Classic Map** - Official Haxball stadium  
+✅ **Clean UI** - Just score and timer  
 
-MIT
+---
+
+## 🎯 Next Steps
+
+1. **Play**: Open `index.html` and play with a friend
+2. **Bot**: F12 console → `new EnhancedBot(1)` to add AI
+3. **Customize**: Edit `script.js` to change physics or add features
+4. **Train AI**: Use Agent API to build ML-powered bots
+
+---
+
+## 📖 Examples
+
+### Simple Chase Bot
+
+```javascript
+function chaseBot() {
+    const state = AgentAPI.getState();
+    const me = state.players[1]; // Player 2
+    const ball = state.ball;
+    
+    AgentAPI.setPlayerInput(1, {
+        left: ball.x < me.disc.x,
+        right: ball.x > me.disc.x,
+        up: ball.y < me.disc.y,
+        down: ball.y > me.disc.y,
+        kick: AgentAPI.distance(me.disc, ball) < 30
+    });
+}
+
+setInterval(chaseBot, 1000/60);
+```
+
+---
+
+**Ready to build AI agents!** 🤖⚽
+
+Made with ❤️ for offline Haxball AI development
