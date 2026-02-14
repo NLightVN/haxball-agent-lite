@@ -47,8 +47,13 @@ function validateAndApplyMap(mapData) {
 
     console.log(`✅ Map validation passed: ${mapData.name}`);
 
-    // Apply map to global stadium variable
+    // CRITICAL: Process stadium structure BEFORE assigning globally
+    console.log('🔧 Processing stadium structure...');
+    processStadiumStructure(mapData);
+
+    // Now assign to global stadium variable
     stadium = mapData;
+    console.log(`📍 Stadium variable updated to: ${stadium.name}`);
 
     // Apply custom physics if specified
     if (mapData.ballPhysics) {
@@ -59,9 +64,6 @@ function validateAndApplyMap(mapData) {
         console.log('⚙️ Applying custom player physics');
         Object.assign(haxball.playerPhysics, mapData.playerPhysics);
     }
-
-    // Process stadium structure
-    processStadiumStructure(stadium);
 
     // Reset game with new map
     resetGameWithNewMap();
@@ -242,18 +244,23 @@ function resetGameWithNewMap() {
         scores[1].textContent = '0';
     }
 
-    // Load background if specified
+    // Load background if specified (this will trigger render via callback)
     if (stadium.bg && stadium.bg.type) {
+        console.log(`🖼️ Loading background: ${stadium.bg.type}`);
         load_tile(stadium.bg.type);
+    } else {
+        // No custom background - render immediately
+        render(stadium);
     }
 
-    // Re-render with new stadium
+    // Force immediate render to ensure new stadium displays
+    console.log('🎨 Force rendering new stadium...');
     render(stadium);
 
     console.log('✅ Game reset complete');
     console.log(`   Stadium: ${stadium.width}x${stadium.height}`);
     console.log(`   Players active: ${playersArray.length}`);
-    console.log(`   Discs: ${discs.length}`);
+    console.log(`   Discs total: ${discs.length}`);
 }
 
 /**
