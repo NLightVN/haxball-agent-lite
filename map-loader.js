@@ -167,7 +167,7 @@ function resetGameWithNewMap() {
 
     // Apply custom ball physics from stadium if specified
     if (stadium.ballPhysics) {
-        if (stadium.ballPhysics.radius) ballDisc.radius = stadium.ballPhysics.radius;
+        // Skip radius to keep default size (10)
         if (stadium.ballPhysics.bCoef !== undefined) ballDisc.bCoef = stadium.ballPhysics.bCoef;
         if (stadium.ballPhysics.invMass !== undefined) ballDisc.invMass = stadium.ballPhysics.invMass;
         if (stadium.ballPhysics.damping !== undefined) ballDisc.damping = stadium.ballPhysics.damping;
