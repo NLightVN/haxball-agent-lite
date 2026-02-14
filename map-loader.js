@@ -57,6 +57,47 @@ function validateAndApplyMap(mapData) {
 
     console.log(`✅ Map validation passed: ${mapData.name}`);
 
+    // AUTO-FIX: Ensure critical traits have correct visibility
+    if (!mapData.traits) {
+        console.warn('⚠️ Map has no traits defined, creating defaults...');
+        mapData.traits = {};
+    }
+
+    // Fix ballArea trait - MUST be visible for field boundaries to show
+    if (mapData.traits.ballArea) {
+        if (mapData.traits.ballArea.vis === false) {
+            console.warn('⚠️ AUTO-FIX: Setting ballArea.vis = true (was false)');
+            mapData.traits.ballArea.vis = true;
+        }
+    } else {
+        console.warn('⚠️ AUTO-FIX: Creating ballArea trait with vis:true');
+        mapData.traits.ballArea = {
+            vis: true,
+            bCoef: 1,
+            cMask: ['ball']
+        };
+    }
+
+    // Fix goalNet trait - MUST be visible for goal posts to show
+    if (mapData.traits.goalNet) {
+        if (mapData.traits.goalNet.vis === false) {
+            console.warn('⚠️ AUTO-FIX: Setting goalNet.vis = true (was false)');
+            mapData.traits.goalNet.vis = true;
+        }
+    } else if (mapData.segments.some(s => s.trait === 'goalNet')) {
+        console.warn('⚠️ AUTO-FIX: Creating goalNet trait with vis:true');
+        mapData.traits.goalNet = {
+            vis: true,
+            bCoef: 0.1,
+            cMask: ['ball']
+        };
+    }
+
+    console.log('🔧 Auto-fix complete:', {
+        ballArea_vis: mapData.traits.ballArea?.vis,
+        goalNet_vis: mapData.traits.goalNet?.vis
+    });
+
     // CRITICAL: Save to localStorage and reload page
     // This is necessary because script.js caches stadium structure on init
     // Simply changing the global variable doesn't update the cached data
