@@ -163,13 +163,22 @@ function resetGameWithNewMap() {
     // Clear old discs
     discs = [];
 
-    // Recreate ball
+    // Recreate ball at center
     var ballDisc = new Disc();
     ballDisc.ballPhysics();
-    if (stadium.discs && stadium.discs[0]) {
-        setDiscDefaultProperties(ballDisc, stadium.discs[0]);
+    ballDisc.x = 0;
+    ballDisc.y = 0;
+    ballDisc.xspeed = 0;
+    ballDisc.yspeed = 0;
+    // Apply custom ball physics from stadium if specified
+    if (stadium.ballPhysics) {
+        if (stadium.ballPhysics.radius) ballDisc.radius = stadium.ballPhysics.radius;
+        if (stadium.ballPhysics.bCoef !== undefined) ballDisc.bCoef = stadium.ballPhysics.bCoef;
+        if (stadium.ballPhysics.invMass !== undefined) ballDisc.invMass = stadium.ballPhysics.invMass;
+        if (stadium.ballPhysics.damping !== undefined) ballDisc.damping = stadium.ballPhysics.damping;
     }
     discs.push(ballDisc);
+    console.log(`⚽ Ball created at (${ballDisc.x}, ${ballDisc.y}) with radius ${ballDisc.radius}`);
 
     // Add stadium discs (goal posts, etc.)
     if (stadium.discs) {
@@ -202,6 +211,8 @@ function resetGameWithNewMap() {
     // Reset players with new stadium properties
     console.log(`🔄 Resetting ${currentPlayers.length} players with new map`);
     currentPlayers.forEach(player => {
+        // CRITICAL: Clear disc reference so setPlayerDefaultProperties recreates it
+        player.disc = null;
         setPlayerDefaultProperties(player);
     });
 
