@@ -156,7 +156,11 @@ function processStadiumStructure(std) {
 function resetGameWithNewMap() {
     console.log('🔄 Resetting game with new map...');
 
-    // Clear old discs except ball
+    // IMPORTANT: Store current players before clearing
+    const currentPlayers = playersArray.slice();
+    console.log(`👥 Preserving ${currentPlayers.length} players`);
+
+    // Clear old discs
     discs = [];
 
     // Recreate ball
@@ -172,8 +176,16 @@ function resetGameWithNewMap() {
         stadium.discs.forEach((discData, i) => {
             if (i > 0) { // Skip ball (already added)
                 var disc = new Disc();
-                disc.x = discData.x || discData.pos[0];
-                disc.y = discData.y || discData.pos[1];
+
+                // Handle both pos array [x, y] and x/y object format
+                if (discData.pos) {
+                    disc.x = discData.pos[0];
+                    disc.y = discData.pos[1];
+                } else {
+                    disc.x = discData.x || 0;
+                    disc.y = discData.y || 0;
+                }
+
                 disc.radius = discData.radius || 8;
                 disc.invMass = discData.invMass !== undefined ? discData.invMass : 0;
                 disc.bCoef = discData.bCoef !== undefined ? discData.bCoef : 0.5;
@@ -188,7 +200,8 @@ function resetGameWithNewMap() {
     }
 
     // Reset players with new stadium properties
-    playersArray.forEach(player => {
+    console.log(`🔄 Resetting ${currentPlayers.length} players with new map`);
+    currentPlayers.forEach(player => {
         setPlayerDefaultProperties(player);
     });
 
@@ -215,6 +228,8 @@ function resetGameWithNewMap() {
     render(stadium);
 
     console.log('✅ Game reset complete');
+    console.log(`   Players active: ${playersArray.length}`);
+    console.log(`   Discs: ${discs.length}`);
 }
 
 /**
