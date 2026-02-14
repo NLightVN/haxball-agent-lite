@@ -388,16 +388,16 @@ if (!recCheck) {
     );
     setPlayerDefaultProperties(a);
     playersArray.push(a);
-    // var b = new Player();
-    // b.init(
-    //     'Bot',
-    //     '1',
-    //     haxball.Team.RED,
-    //     [],
-    //     alwaysRight
-    // );
-    // setPlayerDefaultProperties(b);
-    // playersArray.push(b);
+    var b = new Player();
+    b.init(
+        'Player 2',
+        '',
+        haxball.Team.BLUE,
+        [['KeyW'], ['KeyA'], ['KeyS'], ['KeyD'], ['Space']],
+        null
+    );
+    setPlayerDefaultProperties(b);
+    playersArray.push(b);
     arrayRec = playersArray.map((p) => [[p.name, p.avatar, p.team.id], []]);
 } else {
     if (localStorage.getItem('rec') == '1') {
