@@ -8,21 +8,11 @@ console.log('🗺️ Map Loader module loading...');
  * @param {File} file - The .hbs file to load
  */
 function loadCustomMap(file) {
-    console.log('📂 File selected:', file.name, 'Size:', file.size, 'bytes');
-
     const reader = new FileReader();
     reader.onload = function (e) {
         try {
-            console.log('📖 File read complete, parsing JSON...');
             const mapData = JSON.parse(e.target.result);
-            console.log(`📥 Parsed map data:`, {
-                name: mapData.name,
-                width: mapData.width,
-                height: mapData.height,
-                segments: mapData.segments ? mapData.segments.length : 0,
-                traits: mapData.traits ? Object.keys(mapData.traits) : []
-            });
-
+            console.log(`📥 Parsing map: ${mapData.name || 'Unnamed'}`);
             validateAndApplyMap(mapData);
         } catch (error) {
             console.error('❌ Invalid HBS file:', error);
@@ -61,13 +51,7 @@ function validateAndApplyMap(mapData) {
     // This is necessary because script.js caches stadium structure on init
     // Simply changing the global variable doesn't update the cached data
     console.log('💾 Saving stadium to localStorage...');
-    console.log('   Stadium to save:', {
-        name: mapData.name,
-        segments: mapData.segments.length,
-        ballArea_vis: mapData.traits?.ballArea?.vis
-    });
     localStorage.setItem('customStadium', JSON.stringify(mapData));
-    console.log('✅ Saved to localStorage successfully');
 
     // Apply custom physics to localStorage as well
     if (mapData.ballPhysics) {
