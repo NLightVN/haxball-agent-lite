@@ -58,8 +58,9 @@ function validateAndApplyMap(mapData) {
     console.log(`✅ Map validation passed: ${mapData.name}`);
 
     // AUTO-FIX: Ensure critical traits have correct visibility
-    if (!mapData.traits) {
-        console.warn('⚠️ Map has no traits defined, creating defaults...');
+    // CRITICAL: Some maps have traits as an array [] instead of object {}
+    if (!mapData.traits || Array.isArray(mapData.traits)) {
+        console.warn('⚠️ AUTO-FIX: traits is missing or array, converting to object');
         mapData.traits = {};
     }
 
