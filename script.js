@@ -416,7 +416,7 @@ if (!recCheck) {
         '🔵',
         haxball.Team.BLUE,
         [['ArrowUp'], ['ArrowLeft'], ['ArrowDown'], ['ArrowRight'], ['KeyX']],
-        null
+        chaseBallBot // Blue team is now a bot by default
     );
     setPlayerDefaultProperties(b);
     playersArray.push(b);
