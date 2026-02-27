@@ -193,42 +193,17 @@ class HaxballA0Env(gym.Env):
         self.max_steps = ep_secs * PHYSICS_HZ // FRAME_SKIP
 
         # ── Field & Goal Curriculum ──
+        # Always use full map size
+        size_class = '1v1' if self.n_agents == 1 else '2v2'
+        cands = [p for p in MAP_PRESETS if p[3] == size_class] or MAP_PRESETS
+        preset = cands[int(self._rng.integers(0, len(cands)))]
+        self.HW = float(preset[0])
+        self.HH = float(preset[1])
+        
         if t < CURRICULUM_PHASE2:
-            # Phase 1: 50% to 60% of Futsal Map, HH < HW
-            size_class = '1v1' if self.n_agents == 1 else '2v2'
-            cands = [p for p in MAP_PRESETS if p[3] == size_class] or MAP_PRESETS
-            preset = cands[int(self._rng.integers(0, len(cands)))]
-            
-            base_hw, base_hh = preset[0], preset[1]
-            self.HW = float(self._rng.uniform(base_hw * 0.5, base_hw * 0.6))
-            self.HH = float(self._rng.uniform(base_hh * 0.5, base_hh * 0.6))
-            if self.HH >= self.HW:
-                self.HH, self.HW = self.HW, self.HH
-            
-            # Goal is 70% to 90% of HH
+            # Goal is 70% to 90% of HH for the first 300k steps
             self.goal_y = float(self._rng.uniform(0.7, 0.9)) * self.HH
-            
-        elif t < CURRICULUM_PHASE3:
-            # Phase 2: Half Futsal, HH < HW
-            size_class = '1v1' if self.n_agents == 1 else '2v2'
-            cands = [p for p in MAP_PRESETS if p[3] == size_class] or MAP_PRESETS
-            preset = cands[int(self._rng.integers(0, len(cands)))]
-            
-            # Half size, with some variance, enforce HH < HW
-            base_hw, base_hh = preset[0] * 0.5, preset[1] * 0.5
-            self.HW = float(self._rng.uniform(base_hw * 0.8, base_hw * 1.2))
-            self.HH = float(self._rng.uniform(base_hh * 0.8, base_hh * 1.2))
-            if self.HH >= self.HW:
-                self.HH, self.HW = self.HW, self.HH
-            
-            self.goal_y = float(self._rng.uniform(15.0, 32.5))
         else:
-            # Phase 3: Full Futsal
-            size_class = '1v1' if self.n_agents == 1 else '2v2'
-            cands = [p for p in MAP_PRESETS if p[3] == size_class] or MAP_PRESETS
-            preset = cands[int(self._rng.integers(0, len(cands)))]
-            self.HW = float(preset[0])
-            self.HH = float(preset[1])
             self.goal_y = float(self._rng.uniform(30.0, 65.0))
 
         # Always Randomize Goal Center Y
@@ -325,31 +300,26 @@ class HaxballA0Env(gym.Env):
 
         if goal_result == 2:
             # Scored into right goal ✅
-            reward = 1.0  # Sparse reward for scoring
-            terminated = True
-
-        elif goal_result == 1:
-            # Own goal ❌
-            # No negative reward as requested
-            reward = 0.0
+            reward = 5.0  # Sparse reward for scoring
             terminated = True
 
         else:
-            # 1. Approach Ball Reward (very small dense = 0.001)
             dist_to_ball = math.hypot(a.x - self.ball.x, a.y - self.ball.y)
-            delta_approach = self._prev_dist_to_ball - dist_to_ball
-            if dist_to_ball - PLYR_R - BALL_R > KICK_RANGE:
-                # Sparse approach reward
-                if delta_approach > 0:
-                    reward += 0.001
             self._prev_dist_to_ball = dist_to_ball
             
-            # The other dense rewards for ball forward and kick speed are removed 
-            # as per sparse reward request.
-            
             goal_x = self.HW * atk
-            self._prev_ball_dist_to_goal = math.hypot(goal_x - self.ball.x, self.goal_center_y - self.ball.y)
-            self._prev_ball_speed = math.hypot(self.ball.xs, self.ball.ys)
+            ball_dist_to_goal = math.hypot(goal_x - self.ball.x, self.goal_center_y - self.ball.y)
+            self._prev_ball_dist_to_goal = ball_dist_to_goal
+
+            ball_speed = math.hypot(self.ball.xs, self.ball.ys)
+            self._prev_ball_speed = ball_speed
+            
+            # Time penalty if step > 60
+            if self.step_count > 60:
+                # Penalty: step 61 = -0.001, step 62 = -0.0012, step 63 = -0.0014...
+                # Formula: 0.001 + (step_count - 61) * 0.0002
+                steps_over = self.step_count - 60
+                reward -= (0.001 + (steps_over - 1) * 0.0002)
 
         # Timeout
         truncated = False
