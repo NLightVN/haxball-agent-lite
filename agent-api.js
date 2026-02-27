@@ -116,20 +116,21 @@ window.AgentAPI = {
     getBoundingBox: getBoundingBox,
 
     // ─────────────────────────────────────────────────────────────────────────
-    // getObs(agentTeam) → flat Float32Array, shape (102,)
+    // getObs(agentTeam) → flat Float32Array, shape (101,)
     //
     // Section 1 — Field constants  [0..3]   4 features
     //   goal_y/NORM, HH/NORM, HW/NORM, agentTeam(0=RED,1=BLUE)
-    // Section 2 — Agent ↔ Ball     [4..9]   6 features
-    //   d_to_ball_x, d_to_ball_y, dist_to_ball, can_kick,
-    //   path_blocked_opp, path_blocked_wall
-    // Section 3 — Dynamic state    [10..18] 9 features
+    // Section 2 — Agent ↔ Ball     [4..7]   4 features
+    //   d_to_ball_x, d_to_ball_y, dist_to_ball, can_kick
+    // Section 3 — Dynamic state    [8..16]  9 features
     //   ball_x, ball_y, ball_xs, ball_ys,
     //   my_x, my_y, my_xs, my_ys, my_speed
-    // Section 4 — Game state       [19..20] 2 features
+    // Section 4 — Game state       [17..18] 2 features
     //   time_remaining, possession
-    // Section 5 — Teammates ×4    [21..56]  9×4=36 features  (pad 0 if absent)
-    // Section 6 — Opponents  ×5   [57..101] 9×5=45 features  (pad 0 if absent)
+    // Section 5 — Teammates ×4    [19..54]  9×4=36 features  (pad 0 if absent)
+    // Section 6 — Opponents  ×5   [55..99]  9×5=45 features  (pad 0 if absent)
+    // Section 7 — Intercept       [100]     1 feature
+    //   intercept_who: +1=agent, +0.5=teammate, -1=opponent, 0=none/unknown
     //
     // Per player (teammate/opp), 9 features:
     //   x/NORM, y/NORM, xs/MS, ys/MS,
@@ -194,48 +195,7 @@ window.AgentAPI = {
             return Math.max(0, Math.hypot(px - mx, py - my) - 2 * PLAYER_R);
         }
 
-        // ── Helper: is circle (cx,cy,r) blocking segment a→b? ──
-        function circleBlocksSeg(ax, ay, cx, cy, r) {
-            const dx = bx - ax, dy = by - ay;
-            const lenSq = dx * dx + dy * dy;
-            if (lenSq === 0) return false;
-            const t = Math.max(0, Math.min(1, ((cx - ax) * dx + (cy - ay) * dy) / lenSq));
-            return Math.hypot(cx - (ax + t * dx), cy - (ay + t * dy)) <= r;
-        }
 
-        // ── path_blocked_opp ──
-        let pathBlockedOpp = 0;
-        for (const p of opponents) {
-            if (circleBlocksSeg(mx, my, p.disc.x, p.disc.y, PLAYER_R + BALL_R)) {
-                pathBlockedOpp = 1; break;
-            }
-        }
-
-        // ── path_blocked_wall: segment-intersection my→ball vs 4 field walls ──
-        // Uses parametric intersection; walls that have a goal gap are split.
-        function segIntersects(ax, ay, bx2, by2, cx, cy, dx2, dy2) {
-            // Returns true if segment (a→b) intersects (c→d)
-            const dab_x = bx2 - ax, dab_y = by2 - ay;
-            const dcd_x = dx2 - cx, dcd_y = dy2 - cy;
-            const denom = dab_x * dcd_y - dab_y * dcd_x;
-            if (Math.abs(denom) < 1e-8) return false;
-            const t = ((cx - ax) * dcd_y - (cy - ay) * dcd_x) / denom;
-            const u = ((cx - ax) * dab_y - (cy - ay) * dab_x) / denom;
-            return t >= 0 && t <= 1 && u >= 0 && u <= 1;
-        }
-        let pathBlockedWall = 0;
-        // top wall
-        if (segIntersects(mx, my, bx, by, -HW, -HH, HW, -HH)) pathBlockedWall = 1;
-        // bottom wall
-        if (!pathBlockedWall && segIntersects(mx, my, bx, by, -HW, HH, HW, HH)) pathBlockedWall = 1;
-        // left wall upper (above goal gap)
-        if (!pathBlockedWall && segIntersects(mx, my, bx, by, -HW, -HH, -HW, -goal_y)) pathBlockedWall = 1;
-        // left wall lower (below goal gap)
-        if (!pathBlockedWall && segIntersects(mx, my, bx, by, -HW, goal_y, -HW, HH)) pathBlockedWall = 1;
-        // right wall upper
-        if (!pathBlockedWall && segIntersects(mx, my, bx, by, HW, -HH, HW, -goal_y)) pathBlockedWall = 1;
-        // right wall lower
-        if (!pathBlockedWall && segIntersects(mx, my, bx, by, HW, goal_y, HW, HH)) pathBlockedWall = 1;
 
         // ── Helper: encode one player (9 features) ──
         function encodePlayer(px, py, pxs, pys) {
@@ -267,14 +227,12 @@ window.AgentAPI = {
         obs.push(HW / NORM);
         obs.push(agentTeam === 1 ? 0 : 1);
 
-        // Section 2 — Agent ↔ Ball (6)
+        // Section 2 — Agent ↔ Ball (4)
         const db_me = distBall(mx, my);
         obs.push(flip * (bx - mx) / NORM);           // d_to_ball_x
-        obs.push((by - my) / NORM);           // d_to_ball_y
+        obs.push((by - my) / NORM);                  // d_to_ball_y
         obs.push(db_me / DIAG);                      // dist_to_ball
         obs.push(Math.hypot(bx - mx, by - my) <= KICK_DIST ? 1 : 0); // can_kick
-        obs.push(pathBlockedOpp);
-        obs.push(pathBlockedWall);
 
         // Section 3 — Dynamic state (9)
         obs.push(flip * bx / NORM);
@@ -323,8 +281,124 @@ window.AgentAPI = {
             }
         }
 
-        // obs.length should be 4+6+9+2+36+45 = 102
+        // obs.length should be 4+4+9+2+36+45 = 100
+
         return obs;
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // firstInterceptor(agentTeam, maxTicks)
+    //
+    // Simulates the ball's trajectory (up to maxTicks frames, WITH wall bounce)
+    // and finds the FIRST player that could physically reach the ball's
+    // position at that tick given their max cruising speed.
+    //
+    // Returns { player, teamId, isAgent, isTeammate, atTick } or null.
+    //
+    // Wall bounce: ball.bCoef × wall.bCoef (futsal walls = 1.0)
+    // Stops if ball enters goal gap (|by| <= goal_y when crossing wall x).
+    // maxSpeed ≈ acceleration / (1 - damping)  [Haxball physics steady-state]
+    // ─────────────────────────────────────────────────────────────────────────
+    firstInterceptor: function (agentTeam, maxTicks = 120, myPlayer = null) {
+        const ball = discs[0];
+        const ballSpeed = Math.hypot(ball.xspeed, ball.yspeed);
+        // Skip expensive loop when ball is nearly stationary
+        if (ballSpeed < 0.05) return null;
+
+        // Determine player max speed from physics (use stadium override if present)
+        const pPhys = (stadium && stadium.playerPhysics) ? stadium.playerPhysics : haxball.playerPhysics;
+        const acc = pPhys.acceleration || haxball.playerPhysics.acceleration;
+        const damp = pPhys.damping || haxball.playerPhysics.damping;
+        // Steady-state max speed when holding one direction continuously
+        const maxSpeed = acc / (1 - damp);
+
+        // Pre-filter: only active field players
+        const activePlayers = playersArray.filter(p => p.disc && p.team.id !== 0);
+        if (activePlayers.length === 0) return null;
+
+        // ── Field bounds & bounce coefficient ──
+        const bbox = getBoundingBox();
+        const HW = (bbox.W || 1400) / 2;
+        const HH = (bbox.H || 640) / 2;
+        let goal_y = 85;
+        if (stadium.goals && stadium.goals.length > 0) {
+            const g = stadium.goals[0];
+            goal_y = Math.abs(g.p0[1] - g.p1[1]) / 2;
+        }
+        // Combined: ball.bCoef × wall.bCoef (futsal walls bCoef = 1.0)
+        const wallBounce = (ball.bCoef !== undefined) ? ball.bCoef : 0.443;
+
+        // Simulate ball position tick-by-tick WITH wall bounce
+        let bx = ball.x, by = ball.y;
+        let bxs = ball.xspeed, bys = ball.yspeed;
+        const ballDamp = ball.damping;
+        const ballRadius = ball.radius;
+
+        for (let t = 1; t <= maxTicks; t++) {
+            // 1. Move
+            bx += bxs; by += bys;
+
+            // 2. Wall bounce (axis-aligned, mirrors HaxBall resolveDPCollision)
+            // ── Top / Bottom (always solid) ──
+            if (by - ballRadius < -HH) {
+                by = -HH + ballRadius;
+                bys = -bys * wallBounce;
+            } else if (by + ballRadius > HH) {
+                by = HH - ballRadius;
+                bys = -bys * wallBounce;
+            }
+            // ── Left wall ──
+            if (bx - ballRadius < -HW) {
+                if (Math.abs(by) <= goal_y) break;  // entered goal → stop
+                bx = -HW + ballRadius;
+                bxs = -bxs * wallBounce;
+            }
+            // ── Right wall ──
+            else if (bx + ballRadius > HW) {
+                if (Math.abs(by) <= goal_y) break;  // entered goal → stop
+                bx = HW - ballRadius;
+                bxs = -bxs * wallBounce;
+            }
+
+            // 3. Damping (after collision resolution)
+            bxs *= ballDamp; bys *= ballDamp;
+
+            // Check each player
+            for (const p of activePlayers) {
+                const pDisc = p.disc;
+                const dist = Math.hypot(pDisc.x - bx, pDisc.y - by);
+                // Touch distance: player surface to ball surface
+                const touchDist = Math.max(0, dist - pDisc.radius - ballRadius);
+                // Ticks needed at max speed (optimistic: ignores acceleration ramp-up)
+                const ticksNeeded = touchDist / maxSpeed;
+                if (ticksNeeded <= t) {
+                    const isAgent = (myPlayer !== null) ? (p === myPlayer) : (p.team.id === agentTeam);
+                    const isTeammate = !isAgent && (p.team.id === agentTeam);
+                    return {
+                        player: p,
+                        teamId: p.team.id,
+                        isAgent: isAgent,
+                        isTeammate: isTeammate,
+                        atTick: t,
+                    };
+                }
+            }
+        }
+        return null; // no player can intercept within maxTicks
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // getInterceptReward(agentTeam, maxTicks)
+    //
+    // Convenience wrapper that converts firstInterceptor result into a scalar:
+    //   +1   → agent (or teammate) intercepts first  (positive possession)
+    //   -1   → opponent intercepts first
+    //    0   → ball stationary or no one can reach in time
+    // ─────────────────────────────────────────────────────────────────────────
+    getInterceptReward: function (agentTeam, maxTicks = 120) {
+        const result = this.firstInterceptor(agentTeam, maxTicks);
+        if (!result) return 0;
+        return result.teamId === agentTeam ? 1 : -1;
     },
 
 

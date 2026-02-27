@@ -262,15 +262,24 @@ if (customStadiumData) {
     stadium = JSON.parse(customStadiumData);
     console.log(`✅ Loaded custom stadium: ${stadium.name}`);
 
-    // Apply custom physics if saved
-    var customBallPhysics = localStorage.getItem('customBallPhysics');
-    var customPlayerPhysics = localStorage.getItem('customPlayerPhysics');
-    if (customBallPhysics) {
-        Object.assign(haxball.ballPhysics, JSON.parse(customBallPhysics));
+    // Override physics from the stadium map, but SKIP cGroup/cMask.
+    // cGroup/cMask must remain as string arrays so collisionTransformation() can
+    // convert them correctly. Overwriting them with undefined/0 breaks all collisions.
+    var _skipKeys = ['cGroup', 'cMask', 'pos'];
+    if (stadium.ballPhysics) {
+        for (var _k in stadium.ballPhysics) {
+            if (_skipKeys.indexOf(_k) === -1) haxball.ballPhysics[_k] = stadium.ballPhysics[_k];
+        }
     }
-    if (customPlayerPhysics) {
-        Object.assign(haxball.playerPhysics, JSON.parse(customPlayerPhysics));
+    if (stadium.playerPhysics) {
+        for (var _k in stadium.playerPhysics) {
+            if (_skipKeys.indexOf(_k) === -1) haxball.playerPhysics[_k] = stadium.playerPhysics[_k];
+        }
     }
+    console.log('🎮 Physics overrides applied from stadium map:', {
+        ball: { radius: haxball.ballPhysics.radius, bCoef: haxball.ballPhysics.bCoef, invMass: haxball.ballPhysics.invMass, damping: haxball.ballPhysics.damping },
+        player: { kickStrength: haxball.playerPhysics.kickStrength, acceleration: haxball.playerPhysics.acceleration, kickingAcceleration: haxball.playerPhysics.kickingAcceleration }
+    });
 } else {
     // Load default Classic stadium
     stadium = JSON.parse(
@@ -306,11 +315,20 @@ discs.forEach((d) => {
     d = collisionTransformation(d);
 });
 
-var ballPhysics = stadium_copy.ballPhysics || {};
+// Build ball disc by starting from haxball defaults, then overriding with stadium-specific values.
+// This ensures cGroup:['ball'] and cMask:['all'] are always present (required for collision detection).
+var _stadiumBallPhysics = stadium_copy.ballPhysics || {};
+var ballPhysics = {};
 for (const [key, value] of Object.entries(haxball.ballPhysics)) {
-    if (ballPhysics[key] === undefined) ballPhysics[key] = value;
+    ballPhysics[key] = value;
 }
+// Apply stadium overrides only for physics properties (not collision flags)
+var _ballOverrideKeys = ['radius', 'bCoef', 'invMass', 'damping', 'color', 'pos'];
+_ballOverrideKeys.forEach(function (k) {
+    if (_stadiumBallPhysics[k] !== undefined) ballPhysics[k] = _stadiumBallPhysics[k];
+});
 discs.unshift(collisionTransformation(ballPhysics));
+console.log('⚽ Ball disc created:', { radius: ballPhysics.radius, bCoef: ballPhysics.bCoef, invMass: ballPhysics.invMass, damping: ballPhysics.damping, cGroup: discs[0].cGroup, cMask: discs[0].cMask });
 
 var vertexes = stadium_copy.vertexes;
 vertexes.forEach((v) => {
@@ -416,7 +434,7 @@ if (!recCheck) {
         '🔵',
         haxball.Team.BLUE,
         [['ArrowUp'], ['ArrowLeft'], ['ArrowDown'], ['ArrowRight'], ['KeyX']],
-        chaseBallBot // Blue team is now a bot by default
+        ppoBot // Default to PPO bot
     );
     setPlayerDefaultProperties(b);
     playersArray.push(b);
@@ -2279,6 +2297,227 @@ function predictPositionBall(position, speed, frames) {
     return { x: x_new, y: y_new };
 }
 
-setInterval(() => {
-    window.requestAnimationFrame(draw);
-}, 1000 / 60);
+// ─── Training / Headless loop ────────────────────────────────────────────────
+//
+// physicsStep() = all game logic extracted from draw()
+// gameLoop(ts)  = rAF callback: runs N physicsSteps then optionally renders
+//
+// Usage from DevTools console:
+//   TrainingViz.enable(20, 100)   → 20× speed, render every 100 ms
+//   TrainingViz.headless(100)     → 100× speed, NO render at all
+//   TrainingViz.disable()         → back to normal 60 fps
+//   TrainingViz.setSpeed(n)       → change steps-per-frame on the fly
+// ─────────────────────────────────────────────────────────────────────────────
+
+var _tvMode = false;   // training mode on/off
+var _tvSteps = 10;      // physics steps per rAF frame
+var _tvRenderMs = 100;     // ms between canvas renders (Infinity = never)
+var _tvLastRender = 0;
+var _tvTotalTicks = 0;
+
+// physicsStep: pure game-logic, no canvas ops
+function physicsStep() {
+    currentFrame++;
+    var scoreIndex = 0;
+
+    for (var i = 0; i < discs.length; i++) {
+        var disc = discs[i];
+        if ((disc.cGroup & 128) != 0) {
+            scorableDiscsId[scoreIndex] = i;
+            scorableDiscsPos[scoreIndex][0] = disc.x;
+            scorableDiscsPos[scoreIndex][1] = disc.y;
+            scoreIndex++;
+        }
+    }
+
+    playersArray
+        .filter((p) => p.team.id !== 0)
+        .forEach((p, i) => {
+            if (p.bot) p.bot(p, { inputArray: arrayRec[i] ? arrayRec[i][1] : [] });
+            resolvePlayerMovement(p);
+            if (inputArrayCurr[i]) inputArrayCurr[i][1][currentFrame] = p.inputs;
+        });
+
+    discs.forEach((d) => {
+        d.x += d.xspeed;
+        d.y += d.yspeed;
+        d.xspeed *= d.damping;
+        d.yspeed *= d.damping;
+    });
+
+    discs.forEach((d_a, i_a) => {
+        discs
+            .filter((_, i) => i > i_a)
+            .forEach((d_b) => {
+                if ((d_a.cGroup & d_b.cMask) !== 0 && (d_a.cMask & d_b.cGroup) !== 0) {
+                    resolveDDCollision(d_a, d_b);
+                }
+            });
+        if (d_a.invMass !== 0) {
+            planes.forEach((p) => {
+                if ((d_a.cGroup & p.cMask) !== 0 && (d_a.cMask & p.cGroup) !== 0)
+                    resolveDPCollision(d_a, p);
+            });
+            segments.forEach((s) => {
+                if ((d_a.cGroup & s.cMask) !== 0 && (d_a.cMask & s.cGroup) !== 0)
+                    resolveDSCollision(d_a, s);
+            });
+            vertexes.forEach((v) => {
+                if ((d_a.cGroup & v.cMask) !== 0 && (d_a.cMask & v.cGroup) !== 0)
+                    resolveDVCollision(d_a, v);
+            });
+        }
+    });
+
+    if (game.state == 0) {
+        for (var i = 0; i < discs.length; i++) {
+            var disc = discs[i];
+            if (disc.x != null) disc.cMask = 39 | game.kickoffReset;
+        }
+        var ball = discs[0];
+        if (ball.xspeed * ball.xspeed + ball.yspeed * ball.yspeed > 0) game.state = 1;
+    } else if (game.state == 1) {
+        game.time += 0.016666666666666666;
+        for (var i = 0; i < discs.length; i++) {
+            var disc = discs[i];
+            if (disc.x != null) disc.cMask = 39;
+        }
+        var scoreTeam = haxball.Team.SPECTATORS;
+        for (var i = 0; i < scoreIndex; i++) {
+            scoreTeam = checkGoal(
+                [discs[scorableDiscsId[i]].x, discs[scorableDiscsId[i]].y],
+                scorableDiscsPos[i]
+            );
+            if (scoreTeam != haxball.Team.SPECTATORS) break;
+        }
+        if (scoreTeam != haxball.Team.SPECTATORS) {
+            game.state = 2;
+            game.timeout = 150;
+            game.teamGoal = scoreTeam;
+            scoreTeam.name == haxball.Team.BLUE.name ? game.red++ : game.blue++;
+            if (
+                !((game.scoreLimit > 0 &&
+                    (game.red >= game.scoreLimit || game.blue >= game.scoreLimit)) ||
+                    (game.timeLimit > 0 &&
+                        game.time >= 60 * game.timeLimit &&
+                        game.red != game.blue))
+            ) {
+                game.kickoffReset = scoreTeam.id * 8;
+            }
+        } else {
+            if (game.timeLimit > 0 && game.time >= 60 * game.timeLimit && game.red != game.blue) {
+                endAnimation();
+            }
+        }
+    } else if (game.state == 2) {
+        game.timeout--;
+        if (game.timeout <= 0) {
+            if (
+                (game.scoreLimit > 0 &&
+                    (game.red >= game.scoreLimit || game.blue >= game.scoreLimit)) ||
+                (game.timeLimit > 0 &&
+                    game.time >= 60 * game.timeLimit &&
+                    game.red != game.blue)
+            ) {
+                endAnimation();
+            } else {
+                resetPositionDiscs();
+            }
+        }
+    } else if (game.state == 3) {
+        if (!reloadCheck) {
+            if (!recCheck) {
+                inputArrayCurr = [game.kickoffReset, inputArrayCurr];
+                localStorage.setItem('last', JSON.stringify(inputArrayCurr));
+                var recordingFinal = msgpack.serialize(inputArrayCurr);
+                saveRecording(recordingFinal);
+            }
+            document.location.reload(true);
+            reloadCheck = true;
+            setTimeout(() => { reloadCheck = false; }, 1000);
+        }
+        game.timeout--;
+        if (game.timeout <= 0 && game.start) {
+            game.start = false;
+            for (var i = 0; i < playersArray.length; i++) {
+                playersArray[i].disc = null;
+                playersArray[i].spawnPoint = 0;
+            }
+        }
+    }
+}
+
+// rAF-based game loop
+function gameLoop(timestamp) {
+    if (_tvMode) {
+        // Run N physics steps per frame
+        for (var i = 0; i < _tvSteps; i++) {
+            physicsStep();
+            _tvTotalTicks++;
+        }
+        // Render only if enough wall-clock time has passed (or always if renderMs=0)
+        if (timestamp - _tvLastRender >= _tvRenderMs) {
+            // Render HUD + scene
+            render(stadium);
+            updateBar();
+            resize_canvas();
+            _renderTrainingHUD();
+            _tvLastRender = timestamp;
+        }
+    } else {
+        // Normal mode: draw() handles one step + one render
+        draw();
+    }
+    requestAnimationFrame(gameLoop);
+}
+
+function _renderTrainingHUD() {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(10, 10, 230, 70);
+    ctx.fillStyle = '#00ff88';
+    ctx.font = '12px monospace';
+    ctx.fillText('⚡ Tick : ' + _tvTotalTicks, 20, 30);
+    ctx.fillText('⚡ Speed: ' + _tvSteps + '× per frame', 20, 48);
+    ctx.fillText('⚽ Score: RED ' + game.red + '  —  BLUE ' + game.blue, 20, 66);
+    ctx.restore();
+}
+
+window.TrainingViz = {
+    /** Enable training mode: N physics steps per rAF frame; render every renderMs ms */
+    enable: function (steps, renderMs) {
+        steps = steps !== undefined ? steps : 10;
+        renderMs = renderMs !== undefined ? renderMs : 100;
+        _tvMode = true;
+        _tvSteps = steps;
+        _tvRenderMs = renderMs;
+        console.log('\uD83D\uDE80 TrainingViz: ' + steps + '\u00d7 speed, render every ' + renderMs + 'ms');
+    },
+    /** Headless mode: maximum speed, zero rendering */
+    headless: function (steps) {
+        steps = steps !== undefined ? steps : 100;
+        _tvMode = true;
+        _tvSteps = steps;
+        _tvRenderMs = Infinity;
+        console.log('\u26A1 TrainingViz headless: ' + steps + '\u00d7 speed, no render');
+    },
+    /** Return to normal 60-fps mode */
+    disable: function () {
+        _tvMode = false;
+        _tvSteps = 1;
+        console.log('\u23F9 TrainingViz off — back to 60 fps');
+    },
+    /** Change steps-per-frame on the fly */
+    setSpeed: function (n) {
+        _tvSteps = n;
+        console.log('\uD83D\uDD27 TrainingViz speed set to ' + n + '\u00d7');
+    },
+    /** Expose tick counter */
+    get ticks() { return _tvTotalTicks; },
+    /** Reset tick counter */
+    resetTicks: function () { _tvTotalTicks = 0; }
+};
+
+// Boot the game loop
+requestAnimationFrame(gameLoop);

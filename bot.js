@@ -157,7 +157,10 @@ function positionKeeper(player, goal, ball) {
     return intersection;
 }
 
-function alwaysRight(player, args = {}) {
-    player.inputs = input.RIGHT;
-    return
+function ppoBot(player, args = {}) {
+    if (typeof PPOBot !== 'undefined' && PPOBot.loaded) {
+        PPOBot.update(player);
+    } else {
+        player.inputs = 0; // Stand still if model is not loaded or error occurs
+    }
 }

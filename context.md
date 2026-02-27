@@ -22,9 +22,10 @@ Toàn bộ physics engine nằm trong file này (~2285 dòng), bao gồm:
 | `resolveDSCollision` | Collision disc vs segment (tường xiên, lưới) |
 | `resolveDVCollision` | Collision disc vs vertex (cột, góc) |
 | `checkGoal` | Kiểm tra bóng qua vạch goal |
-| `setInterval + requestAnimationFrame` | Game loop cố định 60 FPS |
+| `physicsStep()` | **Mới** — game logic thuần (tách khỏi render) |
+| `gameLoop()` + `TrainingViz` | **Mới** — headless training loop, có thể chạy N×60fps |
 
-> **Lưu ý:** Physics và render hiện đang nằm lẫn trong cùng 1 file, chưa tách module.
+> **Lưu ý:** `physicsStep()` và `draw()` song song tồn tại. Training mode dùng `physicsStep`; normal 60fps dùng `draw()`.
 
 ---
 
@@ -32,7 +33,8 @@ Toàn bộ physics engine nằm trong file này (~2285 dòng), bao gồm:
 
 | File | Vai trò |
 |---|---|
-| `agent-api.js` | API cho AI: `getState()`, `setPlayerInput()`, `predictBallPosition()` |
+| `agent-api.js` | API cho AI: `getState()`, `getObs()`, `setPlayerInput()`, `predictBallPosition()`, `firstInterceptor()`, `getInterceptReward()` |
+| `state-tester.js` | **StateInitializer** (spawn/random state) + **LiveHUD** (overlay real-time intercept stats) |
 | `bot.js` | Bot AI cơ bản |
 | `enhanced-bot.js` | Bot AI nâng cao |
 | `map-loader.js` | Load file `.hbs` (map Haxball) |
@@ -89,96 +91,40 @@ max_speed      = 10       // px/tick (hệ số scale, không phải giới hạ
 
 // --- Từ enhanced-bot.js ---
 kick_range     = 25       // px (center-to-center), surface gap = 25 - 15 - 5.8 = 4.2
+// Công thức engine gốc: dist - r1 - r2 < 4 (khoảng cách bề mặt < 4)
 
-// --- Normalize ---
-NORM           = 800      // chia tọa độ
-DIAG           = 1132     // sqrt(800² + 800²), chia khoảng cách diagonal
+// --- Training ---
+frame_skip     = 6        // physics ticks / step (≈ 100ms/quyết định, @ 60Hz)
 ```
 
 ## Observation format (`AgentAPI.getObs(agentTeam)`)
 
-Observation dạng **object** (không còn là flat array).  
-`agentTeam`: 1 = RED, 2 = BLUE.
+Shape: **`(100,)`** — flat array, tất cả đã normalize.  
+`agentTeam`: 1 = RED, 2 = BLUE. X-coords flip cho BLUE → cả 2 team dùng chung policy.
 
-```js
-obs = {
-  ## 1. Hằng số sân (mỗi episode)
-| Feature | Công thức | Ý nghĩa |
-|---|---|---|
-| `goal_y` | `goal_y / NORM` | Cột goal trên (goal dưới = -goal_y) |
-| `HH_norm` | `HH / NORM` | Tỉ lệ chiều cao sân |
-| `HW_norm` | `HW / NORM` | Tỉ lệ chiều rộng sân |
-| `agentTeam` | `0 hoặc 1` | Team của agent |
-
----
-
-## 2. Agent — Bóng
-| Feature | Công thức | Ý nghĩa |
-|---|---|---|
-| `d_to_ball_x` | `(ball_x - my_x) / NORM` | Vector hướng đến bóng (x) |
-| `d_to_ball_y` | `(ball_y - my_y) / NORM` | Vector hướng đến bóng (y) |
-| `dist_to_ball` | `(dist(ball, my) - player_radius - ball_radius) / DIAG` | Khoảng cách bề mặt đến bóng |
-| `can_kick` | `1.0 if dist_to_ball <= kick_range/DIAG else 0.0` | Có thể sút không |
-| `path_to_ball_blocked_opp` | `1.0 nếu có opponent cắt ngang đường đến bóng` | Đường đến bóng bị chặn bởi opponent |
-| `path_to_ball_blocked_wall` | `1.0 nếu có tường giữa player và bóng` | Đường đến bóng bị chặn bởi tường |
-
----
-
-## 3. Trạng thái động
-| Feature | Công thức | Ý nghĩa |
-|---|---|---|
-| `ball_x, ball_y` | `/ NORM` | Vị trí bóng |
-| `ball_xs, ball_ys` | `/ max_speed` | Vận tốc bóng |
-| `my_x, my_y` | `/ NORM` | Vị trí agent |
-| `my_xs, my_ys` | `/ max_speed` | Vận tốc agent |
-| `my_speed` | `sqrt(my_xs² + my_ys²) / max_speed` | Tổng tốc độ agent |
-
----
-
-## 4. Game state
-| Feature | Công thức | Ý nghĩa |
-|---|---|---|
-| `time_remaining` | `time_left / max_time` | Thời gian còn lại → [0, 1] |
-| `possession` | `sign(opp[0].dist_to_ball - tm[0].dist_to_ball)` | -1 agent team, 0 neutral, +1 opponent |
-
----
-
-## 5. Teammate — `tm[0..3]`
-*(pad zeros nếu không có, sort theo dist_to_ball tăng dần)*
-
-| Feature | Công thức | Ý nghĩa |
-|---|---|---|
-| `x, y` | `/ NORM` | Vị trí |
-| `xs, ys` | `/ max_speed` | Vận tốc |
-| `d_to_me_x` | `(tm_x - my_x) / NORM` | Vector hướng đến agent (x) |
-| `d_to_me_y` | `(tm_y - my_y) / NORM` | Vector hướng đến agent (y) |
-| `dist_to_me` | `(dist(tm, my) - 2*player_radius) / DIAG` | Khoảng cách bề mặt đến agent |
-| `d_to_ball_x` | `(ball_x - tm_x) / NORM` | Vector hướng đến bóng (x) |
-| `d_to_ball_y` | `(ball_y - tm_y) / NORM` | Vector hướng đến bóng (y) |
-| `dist_to_ball` | `(dist(tm, ball) - player_radius - ball_radius) / DIAG` | Khoảng cách bề mặt đến bóng |
-| `can_kick` | `1.0 if dist_to_ball <= kick_range/DIAG else 0.0` | Có thể sút không |
-
-**4 teammate**
-
----
-
-## 6. Opponent — `opp[0..4]`
-*(pad zeros nếu không có, sort theo dist_to_ball tăng dần)*
-
-| Feature | Công thức | Ý nghĩa |
-|---|---|---|
-| `x, y` | `/ NORM` | Vị trí |
-| `xs, ys` | `/ max_speed` | Vận tốc |
-| `d_to_me_x` | `(opp_x - my_x) / NORM` | Vector hướng đến agent (x) |
-| `d_to_me_y` | `(opp_y - my_y) / NORM` | Vector hướng đến agent (y) |
-| `dist_to_me` | `(dist(opp, my) - 2*player_radius) / DIAG` | Khoảng cách bề mặt đến agent |
-| `d_to_ball_x` | `(ball_x - opp_x) / NORM` | Vector hướng đến bóng (x) |
-| `d_to_ball_y` | `(ball_y - opp_y) / NORM` | Vector hướng đến bóng (y) |
-| `dist_to_ball` | `(dist(opp, ball) - player_radius - ball_radius) / DIAG` | Khoảng cách bề mặt đến bóng |
-| `can_kick` | `1.0 if dist_to_ball <= kick_range/DIAG else 0.0` | Có thể sút không |
-
-}
 ```
+Index  Section              Features
+─────────────────────────────────────────────────────────────
+[0..3]   1. Field constants    goal_y, HH, HW (/NORM), agentTeam flag
+[4..7]   2. Agent ↔ Ball       d_to_ball_x/y, dist_to_ball, can_kick
+[8..16]  3. Dynamic state      ball_x/y/xs/ys, my_x/y/xs/ys, my_speed
+[17..18] 4. Game state         time_remaining, possession
+[19..54] 5. Teammates ×4       9 features each (pad 0 if absent)
+[55..99] 6. Opponents ×5       9 features each (pad 0 if absent)
+```
+
+> `intercept_who` đã **bỏ khỏi obs** → dùng `AgentAPI.getInterceptReward()` làm reward thay thế.
+
+
+### Per player (Sections 5 & 6) — 9 features mỗi người
+
+| Feature | Công thức | Ý nghĩa |
+|---|---|---|
+| `x, y` | `/ NORM` | Vị trí |
+| `xs, ys` | `/ MAX_SPEED` | Vận tốc |
+| `d_to_me_x/y` | `(p_x - my_x) / NORM` | Vector đến agent |
+| `d_to_ball_x/y` | `(ball_x - p_x) / NORM` | Vector đến bóng |
+| `dist_to_ball` | surface dist / DIAG | Khoảng cách bề mặt đến bóng |
 
 ---
 
@@ -398,10 +344,32 @@ HW_norm = HW / 800   // ∈ [HH/800, 1.0]
 
 ---
 
+## TrainingViz — Headless Training Loop
+
+Thêm vào cuối `script.js`. Tách `physicsStep()` khỏi render để chạy training nhanh:
+
+```js
+// Trong DevTools console:
+TrainingViz.enable(20, 100)   // 20× speed, render mỗi 100ms
+TrainingViz.headless(100)     // 100× speed, không render gì
+TrainingViz.disable()         // về 60fps thường
+TrainingViz.setSpeed(200)     // đổi tốc độ mid-session
+TrainingViz.ticks             // tổng số tick đã chạy
+```
+
+| Mode | Tốc độ ước tính |
+|---|---|
+| Normal 60fps | ~60 ticks/s |
+| `enable(20, 100)` | ~1.200 ticks/s |
+| `headless(100)` | ~6.000 ticks/s |
+| `headless(1000)` | ~60.000 ticks/s |
+
+---
+
 ## Giới hạn hiện tại
 
-- **Không thể tăng tốc training** — game loop ghim 60 FPS qua `requestAnimationFrame`
-- **Physics chưa tách khỏi render** — cần refactor `script.js` để chạy headless
+- ~~**Không thể tăng tốc training**~~ ✅ **Đã giải quyết** — dùng `TrainingViz.headless(N)`
+- ~~**Physics chưa tách khỏi render**~~ ✅ **Đã giải quyết** — `physicsStep()` độc lập với `draw()`
 - **`spawnDistance`** là bán kính vòng tròn spawn, không thể quy định vị trí cụ thể qua HBS
 
 ---
@@ -505,3 +473,21 @@ Gọi sau mỗi lần agent thực hiện cú shot. Giả lập toàn bộ playe
 - **Điều kiện:** A2 đủ mạnh ở cả công và thủ
 - **Setup:** self-play, sân đầy đủ 2 goal
 - **Reward:** chưa xác định chi tiết — sẽ bổ sung sau
+
+---
+
+## Training Philosophy: Tactical Aiming vs Direct Aiming
+
+> **Lưu ý Quan Trọng trong Thiết Kế Reward (từ User):**
+> *"Trong trường hợp bóng không trong vùng sút được liệu có cần aim như thế? KHÔNG, khi sút quả bóng KHÔNG BẮT BUỘC phải bay thẳng quỹ đạo tĩnh vào goal."*
+
+**Lý do:**
+Việc thiết kế Hàm Thưởng (Reward Function) bắt ép agent luôn giữ `Aim Angle Error = 0` (hướng vận tốc bóng chĩa thẳng tắp vào tâm Gôn) sẽ vô tình **triệt tiêu khả năng sáng tạo** và tư duy chiến thuật của AI. Quá trình huấn luyện cần ưu tiên:
+1.  **Chấp nhận nảy tường (Wall-bouncing):** AI hoàn toàn có thể chủ động sút mạnh bóng đập vào tường dọc/ngang để lợi dụng hình học (bida) vượt qua mặt Opponent thay vì sút trực diện dễ bị block.
+2.  **Cầm bóng thoát pressing (Tactical Retreat / Sidestep):** Khi bị ép sát, AI có quyền dẫn bóng tạt ra góc sân hoặc chuyền ngược lại để giãn đội hình. Nếu Reward Function phạt nặng mỗi khi Vector Vận Tốc lệch khỏi tâm Goal, agent sẽ thà đứng im (farm điểm) hoặc mất bóng chứ không chịu đổi hướng.
+3.  **Future-proof cho chuyền bóng (Passing):** Trong các Phase n_agents > 1, việc đá trái bóng sang một góc hoàn toàn lệch hướng Goal (nhưng có Teammate ở đó) là hành động tối ưu.
+
+**Hướng Giải Quyết Khuyến Nghị / Đang Thử Nghiệm:**
+- Không chấm điểm dựa trên "Góc của Vector Vận Tốc Ngay Lúc Sút" so với Tâm Goal.
+- (A) Chỉ phạt nếu bóng đi lùi sâu về phần sân nhà (Half-court advancement).
+- (B) Hoặc dùng hàm mô phỏng quỹ đạo trước 3 nhịp nảy (`_simulate_trajectory`) để biết bóng có rơi vào Goal ở *điểm nảy cuối cùng* hay không, sau đó mới chấm điểm Aim.
