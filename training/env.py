@@ -9,7 +9,7 @@ Field : Randomly sized each episode — sampled from real futsal map presets:
         • 1v1 maps (n_agents=1): winkys-futsal  (368×171, goal_y=64)
         • 2v2 maps (n_agents=2): felon-network-v2 (520×242, goal_y=76)
                                   galaxy-futsal-v1v2 (401×200, goal_y=70)
-        goal_y  : curriculum — Phase 0 enlarges goal toward [50%, 80%] × HH,
+        goal_y  : curriculum — Phase 0 enlarges goal toward [40%, 60%] × HH,
                   blending back to preset goal_y by GOAL_CURRICULUM_STEPS = 1,000,000 timesteps.
 
 Action space : MultiDiscrete([9, 2])
@@ -201,8 +201,8 @@ class HaxballA0Env(gym.Env):
         self.HH = float(preset[1])
         
         if t < CURRICULUM_PHASE2:
-            # Goal is 70% to 90% of HH for the first 300k steps
-            self.goal_y = float(self._rng.uniform(0.7, 0.9)) * self.HH
+            # Goal is 40% to 60% of HH for the first 300k steps
+            self.goal_y = float(self._rng.uniform(0.4, 0.6)) * self.HH
         else:
             self.goal_y = float(self._rng.uniform(30.0, 65.0))
 
