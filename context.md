@@ -99,7 +99,7 @@ frame_skip     = 6        // physics ticks / step (≈ 100ms/quyết định, @ 
 
 ## Observation format (`AgentAPI.getObs(agentTeam)`)
 
-Shape: **`(100,)`** — flat array, tất cả đã normalize.  
+Shape: **`(106,)`** — flat array, tất cả đã normalize.  
 `agentTeam`: 1 = RED, 2 = BLUE. X-coords flip cho BLUE → cả 2 team dùng chung policy.
 
 ```
@@ -107,10 +107,11 @@ Index  Section              Features
 ─────────────────────────────────────────────────────────────
 [0..3]   1. Field constants    goal_y, HH, HW (/NORM), agentTeam flag
 [4..7]   2. Agent ↔ Ball       d_to_ball_x/y, dist_to_ball, can_kick
-[8..16]  3. Dynamic state      ball_x/y/xs/ys, my_x/y/xs/ys, my_speed
-[17..18] 4. Game state         time_remaining, possession
-[19..54] 5. Teammates ×4       9 features each (pad 0 if absent)
-[55..99] 6. Opponents ×5       9 features each (pad 0 if absent)
+[8..11]  2b. Ball ↔ Goals      opp_goal_dx, opp_post_dy, own_goal_dx, own_post_dy
+[12..22] 3. Dynamic state      ball_x, ball_y (rel), ball_xs, ball_ys, my_x, my_y (rel), my_xs, my_ys, my_speed, rel_xs, rel_ys
+[23..24] 4. Game state         time_remaining, possession
+[25..60] 5. Teammates ×4       9 features each (pad 0 if absent)
+[61..105] 6. Opponents ×5      9 features each (pad 0 if absent)
 ```
 
 > `intercept_who` đã **bỏ khỏi obs** → dùng `AgentAPI.getInterceptReward()` làm reward thay thế.
@@ -259,10 +260,15 @@ Chuyển raw → flat array `[-1, 1]` đưa thẳng vào network:
 
 ```js
 function get_normalized_state(raw, agentTeam) {
-  const { ball, my, opp, HW, HH, goal_y } = raw;
+  const { ball, my, opp, HW, HH, goal_y, goal_center_y = 0 } = raw;
 
   // Flip x nếu BLUE → agent luôn "đá sang phải" từ góc nhìn network
   const flip = (agentTeam === 2) ? -1 : 1;
+
+  const top_post_y = goal_center_y - goal_y;
+  const bot_post_y = goal_center_y + goal_y;
+  const opp_post_y = Math.abs(top_post_y - ball.y) < Math.abs(bot_post_y - ball.y) ? top_post_y : bot_post_y;
+  const own_post_y = opp_post_y;
 
   return [
     // --- Sân: 3 features ---
@@ -270,24 +276,33 @@ function get_normalized_state(raw, agentTeam) {
     HH     / NORM,                   // nửa chiều cao sân
     goal_y / NORM,                   // cột goal (>0 = phía dưới)
 
+    // --- Bóng ↔ Goal: 4 features ---
+    (HW - flip * ball.x) / NORM,     // opp_goal_dx
+    (opp_post_y - ball.y) / NORM,    // opp_post_dy
+    (-HW - flip * ball.x) / NORM,    // own_goal_dx
+    (own_post_y - ball.y) / NORM,    // own_post_dy
+
     // --- Bóng: 4 features ---
     flip * ball.x  / NORM,
-           ball.y  / NORM,
+           (ball.y - goal_center_y) / NORM,
     flip * ball.xs / MAX_SPEED,
            ball.ys / MAX_SPEED,
 
     // --- Agent: 4 features ---
     flip * my.x  / NORM,
-           my.y  / NORM,
+           (my.y - goal_center_y) / NORM,
     flip * my.xs / MAX_SPEED,
            my.ys / MAX_SPEED,
+           Math.hypot(my.xs, my.ys) / MAX_SPEED, // my_speed
+    flip * (my.xs - ball.xs) / MAX_SPEED,        // rel vel x
+           (my.ys - ball.ys) / MAX_SPEED,        // rel vel y
 
     // --- Opponent: 4 features ---
     flip * opp.x  / NORM,
            opp.y  / NORM,
     flip * opp.xs / MAX_SPEED,
            opp.ys / MAX_SPEED,
-  ];  // shape: (15,)
+  ];  // shape: (15, + newly added)
 }
 ```
 

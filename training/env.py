@@ -67,7 +67,7 @@ MAX_SPEED = 10.0
 DIAG      = math.sqrt(NORM ** 2 + NORM ** 2)   # ≈ 1131.4
 N_TM      = 4   # max teammate slots
 N_OPP     = 5   # max opponent slots
-OBS_DIM   = 4 + 4 + 9 + 2 + N_TM * 9 + N_OPP * 9   # = 100
+OBS_DIM   = 4 + 4 + 4 + 11 + 2 + N_TM * 9 + N_OPP * 9   # = 106
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Training meta-constants
@@ -464,6 +464,17 @@ class HaxballA0Env(gym.Env):
         obs[i] = surf_dist / DIAG;            i += 1
         obs[i] = can_kick;                    i += 1
 
+        # Section 2b — Ball ↔ Goals (4)
+        top_post_y = self.goal_center_y - self.goal_y
+        bot_post_y = self.goal_center_y + self.goal_y
+        opp_post_y = top_post_y if abs(top_post_y - by) < abs(bot_post_y - by) else bot_post_y
+        own_post_y = opp_post_y
+
+        obs[i] = (self.HW - flip * bx) / NORM;       i += 1  # dx to opp goal line
+        obs[i] = (opp_post_y - by) / NORM;           i += 1  # dy to nearest opp post
+        obs[i] = (-self.HW - flip * bx) / NORM;      i += 1  # dx to own goal line
+        obs[i] = (own_post_y - by) / NORM;           i += 1  # dy to nearest own post
+
         # Section 3 — Dynamic state (11)
         obs[i] = flip * bx / NORM;            i += 1
         obs[i] = (by - self.goal_center_y) / NORM;  i += 1 # Provide ball's relative Y to the goal center so it can aim properly when goal moves
@@ -482,10 +493,10 @@ class HaxballA0Env(gym.Env):
         obs[i] = 0.0;                         i += 1  # possession (no opps)
 
         # Sections 5 & 6 — Teammates × 4 + Opponents × 5, all zeros in A0
-        # (i advances to 100 through the zero-filled array)
+        # (i advances to 106 through the zero-filled array)
 
-        assert i == 21, f"Obs pointer mismatch before padding: {i}"
-        # Remaining [19..99] stay 0 (no teammates / opponents in A0)
+        assert i == 25, f"Obs pointer mismatch before padding: {i}"
+        # Remaining [25..105] stay 0 (no teammates / opponents in A0)
 
         return obs
 
