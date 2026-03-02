@@ -43,12 +43,22 @@
         onerror="console.error('ERROR: agent-api failed')"></script>
     <script src="enhanced-bot.js" onload="console.log('6. enhanced-bot loaded')"
         onerror="console.error('ERROR: enhanced-bot failed')"></script>
+
+    <!-- PPO Bot: onnxruntime-web + model inference -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"
+        onload="console.log('7. onnxruntime-web loaded')"
+        onerror="console.error('ERROR: onnxruntime-web CDN failed')"></script>
+    <script src="ppo_bot.js" onload="console.log('8. ppo_bot.js loaded')"
+        onerror="console.error('ERROR: ppo_bot.js failed')"></script>
+
     <script>
         console.log('=== ALL SCRIPTS LOADED ===');
         setTimeout(() => {
             console.log('Canvas:', document.getElementById('canvas_div'));
             console.log('Players:', typeof playersArray !== 'undefined' ? playersArray.length : 'UNDEFINED');
-        }, 1000);
+            console.log('PPOBot ready:', typeof PPOBot !== "undefined" ? PPOBot.loaded : "NOT LOADED");
+            console.log('💡 Add AI bot: AgentAPI.addBot("A1", 1, ppoBot)');
+        }, 2000);
     </script>
 </body>
 
