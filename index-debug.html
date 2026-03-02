@@ -28,6 +28,40 @@
     </div>
     <canvas id="canvas_div"></canvas>
 
+    <!-- Auto-load futsal map into localStorage before game init -->
+    <script>
+        (function () {
+            var DEFAULT_MAP = 'maps/futsal.hbs';
+            var existing = localStorage.getItem('customStadium');
+            var alreadyFutsal = false;
+            if (existing) {
+                try {
+                    var s = JSON.parse(existing);
+                    // Consider it already loaded if name contains 'utsal' (covers different futsal map names)
+                    if (s.name && s.name.toLowerCase().indexOf('futsal') !== -1) alreadyFutsal = true;
+                } catch (e) { }
+            }
+            if (!alreadyFutsal) {
+                console.log('[auto-map] Fetching futsal map...');
+                fetch(DEFAULT_MAP)
+                    .then(function (r) { return r.json(); })
+                    .then(function (mapData) {
+                        // Apply trait fixes (same as validateAndApplyMap)
+                        if (!mapData.traits || Array.isArray(mapData.traits)) mapData.traits = {};
+                        if (!mapData.traits.ballArea) mapData.traits.ballArea = { vis: true, bCoef: 1, cMask: ['ball'] };
+                        if (!mapData.traits.goalNet && mapData.segments && mapData.segments.some(function (s) { return s.trait === 'goalNet'; }))
+                            mapData.traits.goalNet = { vis: true, bCoef: 0.1, cMask: ['ball'] };
+                        localStorage.setItem('customStadium', JSON.stringify(mapData));
+                        console.log('[auto-map] Futsal map saved, reloading...');
+                        location.reload();
+                    })
+                    .catch(function (e) { console.warn('[auto-map] Could not fetch futsal.hbs:', e); });
+            } else {
+                console.log('[auto-map] Futsal map already in localStorage, skipping fetch.');
+            }
+        })();
+    </script>
+
     <!-- Load scripts in order -->
     <script>
         console.log('=== LOADING GAME ===');
