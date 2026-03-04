@@ -2314,23 +2314,28 @@ function pointDistance(p1, p2) {
 
 /**
  * _checkAndUpdateBouncePath — called after every collision resolution.
- * Detects any significant change in ball velocity vs. what damping alone would produce,
- * then recomputes activeBouncePredict from the current ball state.
- * Threshold: cosine of direction change < 0.97  OR  speed increased (player kick/touch).
+ * Recomputes bounce prediction whenever ball velocity changes in ANY way:
+ *   - Any direction change (dot < 0.9999): player touch, deflect, block
+ *   - Speed increase (kick, pass)
+ *   - Speed decrease (player body absorbs ball, friction contact)
+ * Wall bounces also trigger recompute, which is correct since
+ * the prediction refreshes from the new post-bounce position.
  */
 function _checkAndUpdateBouncePath() {
     var bvx = discs[0].xspeed, bvy = discs[0].yspeed;
     var curSpd = Math.sqrt(bvx * bvx + bvy * bvy);
     var prevSpd = Math.sqrt(_prevBallVx * _prevBallVx + _prevBallVy * _prevBallVy);
-    if (curSpd < 0.05 && prevSpd < 0.05) return; // both ~stopped, nothing to do
+    if (curSpd < 0.05 && prevSpd < 0.05) return; // both ~stopped, no update needed
     var changed = false;
     if (curSpd > 0.05 && prevSpd > 0.05) {
+        // Any direction change at all (catches tiny deflections off player bodies)
         var dot = (bvx * _prevBallVx + bvy * _prevBallVy) / (curSpd * prevSpd);
-        if (dot < 0.97) changed = true;             // direction changed (player touch / wall)
+        if (dot < 0.9999) changed = true;
     }
-    if (curSpd > prevSpd + 0.3) changed = true;     // speed jumped (kick)
+    // Speed change in either direction: kick increases, player block decreases
+    if (Math.abs(curSpd - prevSpd) > 0.1) changed = true;
     if (!changed) return;
-    // Recompute from current ball state
+    // Recompute full bounce path from current ball position/velocity
     activeBouncePredict.bouncePath = computeBouncePath(discs[0]);
     activeBouncePredict.kickFrame = currentFrame;
 }
