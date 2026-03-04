@@ -415,6 +415,10 @@ var recCheck =
 var playersArray = [];
 var arrayRec = [];
 var kickArray = [];
+// activeBouncePredict: updated whenever ball velocity changes (kick, touch, or unexpected bounce)
+var activeBouncePredict = { bouncePath: [], kickFrame: 0 };
+// Ball velocity saved after each movement step, before collision resolution
+var _prevBallVx = 0, _prevBallVy = 0;
 var triggerDistance = 15 + 10 + 0.01;
 
 if (!recCheck) {
@@ -1018,6 +1022,9 @@ function resolvePlayerMovement(player) {
                         var newKick = kickArray[kickArray.length - 1];
                         newKick.kickFrame = currentFrame;
                         newKick.bouncePath = computeBouncePath(d);
+                        // Also update activeBouncePredict for renderBouncePath
+                        activeBouncePredict.bouncePath = newKick.bouncePath;
+                        activeBouncePredict.kickFrame = currentFrame;
                         calculateConeAndType(discs, player);
                         check = true;
                     }
@@ -1299,6 +1306,9 @@ function draw() {
         d.xspeed *= d.damping;
         d.yspeed *= d.damping;
     });
+    // Save ball velocity AFTER movement+damping, BEFORE collision resolution
+    _prevBallVx = discs[0].xspeed;
+    _prevBallVy = discs[0].yspeed;
 
     discs.forEach((d_a, i_a) => {
         // collisions
@@ -1339,6 +1349,9 @@ function draw() {
             });
         }
     });
+    // After all collisions: if ball velocity changed significantly, recompute bounce prediction.
+    // This catches player touches, kicks from opponents, and unexpected deflections.
+    _checkAndUpdateBouncePath();
 
     if (game.state == 0) {
         // "kickOffReset"
@@ -2299,6 +2312,29 @@ function pointDistance(p1, p2) {
     return Math.sqrt(d1 * d1 + d2 * d2);
 }
 
+/**
+ * _checkAndUpdateBouncePath — called after every collision resolution.
+ * Detects any significant change in ball velocity vs. what damping alone would produce,
+ * then recomputes activeBouncePredict from the current ball state.
+ * Threshold: cosine of direction change < 0.97  OR  speed increased (player kick/touch).
+ */
+function _checkAndUpdateBouncePath() {
+    var bvx = discs[0].xspeed, bvy = discs[0].yspeed;
+    var curSpd = Math.sqrt(bvx * bvx + bvy * bvy);
+    var prevSpd = Math.sqrt(_prevBallVx * _prevBallVx + _prevBallVy * _prevBallVy);
+    if (curSpd < 0.05 && prevSpd < 0.05) return; // both ~stopped, nothing to do
+    var changed = false;
+    if (curSpd > 0.05 && prevSpd > 0.05) {
+        var dot = (bvx * _prevBallVx + bvy * _prevBallVy) / (curSpd * prevSpd);
+        if (dot < 0.97) changed = true;             // direction changed (player touch / wall)
+    }
+    if (curSpd > prevSpd + 0.3) changed = true;     // speed jumped (kick)
+    if (!changed) return;
+    // Recompute from current ball state
+    activeBouncePredict.bouncePath = computeBouncePath(discs[0]);
+    activeBouncePredict.kickFrame = currentFrame;
+}
+
 function predictPositionBall(position, speed, frames) {
     var sum = (1 - discs[0].damping ** frames) / (1 - discs[0].damping);
     var x_new = position.x + speed.x * sum;
@@ -2395,16 +2431,16 @@ function computeBouncePath(ballDisc) {
  * Called inside render() after other elements.
  */
 function renderBouncePath() {
-    if (kickArray.length === 0) return;
-    var kick = kickArray[kickArray.length - 1];
-    if (!kick.bouncePath || kick.bouncePath.length === 0) return;
+    var pred = activeBouncePredict;
+    if (!pred.bouncePath || pred.bouncePath.length === 0) return;
 
-    // Shift off bounces that have already occurred
-    var framesSinceKick = currentFrame - kick.kickFrame;
-    while (kick.bouncePath.length > 0 && kick.bouncePath[0].stepsFromKick <= framesSinceKick) {
-        kick.bouncePath.shift();
+    // Shift off bounces that have already occurred (stepsFromKick is relative to kickFrame)
+    var framesSinceKick = currentFrame - pred.kickFrame;
+    while (pred.bouncePath.length > 0 && pred.bouncePath[0].stepsFromKick <= framesSinceKick) {
+        pred.bouncePath.shift();
     }
-    if (kick.bouncePath.length === 0) return;
+    if (pred.bouncePath.length === 0) return;
+    var kick = pred; // alias for rest of function
 
     // ── Draw trajectory line from ball current position through bounce points ──
     ctx.save();
@@ -2529,6 +2565,9 @@ function physicsStep() {
         d.xspeed *= d.damping;
         d.yspeed *= d.damping;
     });
+    // Save ball velocity AFTER movement+damping, BEFORE collision resolution
+    _prevBallVx = discs[0].xspeed;
+    _prevBallVy = discs[0].yspeed;
 
     discs.forEach((d_a, i_a) => {
         discs
@@ -2553,6 +2592,8 @@ function physicsStep() {
             });
         }
     });
+    // After all collisions: if ball velocity changed significantly, recompute bounce prediction.
+    _checkAndUpdateBouncePath();
 
     if (game.state == 0) {
         for (var i = 0; i < discs.length; i++) {
