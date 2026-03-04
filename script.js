@@ -495,6 +495,10 @@ function BallKick(
     this.playerDiscs = playerDiscs;
     this.coneArray = coneArray;
     this.types = types;
+    // bouncePath: array of { position:{x,y}, stepsFromKick:N, velocity:{x,y} }
+    // The first element is always the NEXT upcoming bounce (shifts off after each actual bounce).
+    this.bouncePath = [];
+    this.kickFrame = 0; // currentFrame at time of kick
 }
 
 function ConeElement(
@@ -1010,6 +1014,10 @@ function resolvePlayerMovement(player) {
                                 []
                             )
                         );
+                        // Compute bounce prediction immediately after kick
+                        var newKick = kickArray[kickArray.length - 1];
+                        newKick.kickFrame = currentFrame;
+                        newKick.bouncePath = computeBouncePath(d);
                         calculateConeAndType(discs, player);
                         check = true;
                     }
@@ -1538,6 +1546,7 @@ function render(st) {
     });
 
     // if (kickArray.length > 0) renderCones();
+    if (kickArray.length > 0) renderBouncePath();
 }
 
 function renderCones() {
@@ -2295,6 +2304,182 @@ function predictPositionBall(position, speed, frames) {
     var x_new = position.x + speed.x * sum;
     var y_new = position.y + speed.y * sum;
     return { x: x_new, y: y_new };
+}
+
+/**
+ * computeBouncePath — simulate ball trajectory with wall/segment bounces.
+ * Returns array of bounce events: { position:{x,y}, stepsFromKick:N, velocity:{x,y} }
+ * stepsFromKick = number of physics ticks from kick to that bounce.
+ * The array is ordered from soonest to latest bounce.
+ * After each real bounce occurs in game, the first entry is shifted off.
+ */
+function computeBouncePath(ballDisc) {
+    var MAX_STEPS = 600;   // ~10 seconds at 60fps
+    var STOP_SPEED = 0.5;  // px/tick — consider ball stopped below this
+    var BOUNCE_DOT_THRESHOLD = 0.98; // cos(angle) below this = bounce detected
+    var bounces = [];
+
+    // Deep-copy ball state
+    var b = {
+        x: ballDisc.x, y: ballDisc.y,
+        xspeed: ballDisc.xspeed, yspeed: ballDisc.yspeed,
+        radius: ballDisc.radius,
+        bCoef: ballDisc.bCoef,
+        damping: ballDisc.damping,
+        invMass: ballDisc.invMass,
+        cGroup: ballDisc.cGroup,
+        cMask: ballDisc.cMask,
+    };
+
+    var prevVx = b.xspeed, prevVy = b.yspeed;
+
+    for (var step = 1; step <= MAX_STEPS; step++) {
+        // Move
+        b.x += b.xspeed;
+        b.y += b.yspeed;
+        b.xspeed *= b.damping;
+        b.yspeed *= b.damping;
+
+        // Wall / segment collisions (ball only, no other discs)
+        planes.forEach(function (p) {
+            if ((b.cGroup & p.cMask) !== 0 && (b.cMask & p.cGroup) !== 0)
+                resolveDPCollision(b, p);
+        });
+        segments.forEach(function (s) {
+            if ((b.cGroup & s.cMask) !== 0 && (b.cMask & s.cGroup) !== 0)
+                resolveDSCollision(b, s);
+        });
+
+        var curSpd = Math.sqrt(b.xspeed * b.xspeed + b.yspeed * b.yspeed);
+        var prevSpd = Math.sqrt(prevVx * prevVx + prevVy * prevVy);
+
+        // Detect bounce: significant direction change
+        if (prevSpd > 0.05 && curSpd > 0.05) {
+            var dot = (b.xspeed * prevVx + b.yspeed * prevVy) / (curSpd * prevSpd);
+            if (dot < BOUNCE_DOT_THRESHOLD) {
+                bounces.push({
+                    position: { x: b.x, y: b.y },
+                    stepsFromKick: step,
+                    velocity: { x: b.xspeed, y: b.yspeed },
+                });
+            }
+        }
+
+        prevVx = b.xspeed;
+        prevVy = b.yspeed;
+
+        if (curSpd < STOP_SPEED) break;
+
+        // Early exit if clearly in a goal zone (x beyond field bounds)
+        if (stadium.goals) {
+            var exitGoal = false;
+            for (var gi = 0; gi < stadium.goals.length; gi++) {
+                var gl = stadium.goals[gi];
+                var gp0 = gl.p0, gp1 = gl.p1;
+                var gx = gp0[0]; // goal line x
+                var topY = Math.min(gp0[1], gp1[1]);
+                var botY = Math.max(gp0[1], gp1[1]);
+                if (Math.abs(b.x - gx) < 30 && b.y >= topY && b.y <= botY) {
+                    exitGoal = true; break;
+                }
+            }
+            if (exitGoal) break;
+        }
+    }
+
+    return bounces;
+}
+
+/**
+ * renderBouncePath — draws the bounce prediction overlay for the latest kick.
+ * Called inside render() after other elements.
+ */
+function renderBouncePath() {
+    if (kickArray.length === 0) return;
+    var kick = kickArray[kickArray.length - 1];
+    if (!kick.bouncePath || kick.bouncePath.length === 0) return;
+
+    // Shift off bounces that have already occurred
+    var framesSinceKick = currentFrame - kick.kickFrame;
+    while (kick.bouncePath.length > 0 && kick.bouncePath[0].stepsFromKick <= framesSinceKick) {
+        kick.bouncePath.shift();
+    }
+    if (kick.bouncePath.length === 0) return;
+
+    // ── Draw trajectory line from ball current position through bounce points ──
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(discs[0].x, discs[0].y);
+    kick.bouncePath.forEach(function (b) { ctx.lineTo(b.position.x, b.position.y); });
+    ctx.strokeStyle = 'rgba(255, 220, 0, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ── Draw each bounce point ──
+    kick.bouncePath.forEach(function (bounce, idx) {
+        var alpha = Math.max(0.15, 1 - idx * 0.25);   // fade later bounces
+        var stepsLeft = bounce.stepsFromKick - framesSinceKick; // steps until this bounce
+
+        // Color: first bounce = bright yellow, next = orange, later = red-orange
+        var colors = ['#FFE600', '#FF9900', '#FF5500', '#FF2200', '#CC0000'];
+        var color = colors[Math.min(idx, colors.length - 1)];
+
+        // Bounce circle
+        ctx.beginPath();
+        ctx.arc(bounce.position.x, bounce.position.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = alpha;
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Step label (steps from kick to this bounce)
+        ctx.globalAlpha = alpha;
+        ctx.font = 'bold 9px monospace';
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.fillText('\u21A9' + stepsLeft, bounce.position.x, bounce.position.y - 9);
+
+        // Velocity arrow after bounce
+        var spd = Math.sqrt(bounce.velocity.x * bounce.velocity.x + bounce.velocity.y * bounce.velocity.y);
+        if (spd > 0.05) {
+            var arrowLen = Math.min(spd * 6, 40);
+            var ax = bounce.velocity.x / spd;
+            var ay = bounce.velocity.y / spd;
+            ctx.beginPath();
+            ctx.moveTo(bounce.position.x, bounce.position.y);
+            ctx.lineTo(
+                bounce.position.x + ax * arrowLen,
+                bounce.position.y + ay * arrowLen
+            );
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha = alpha * 0.8;
+            ctx.stroke();
+            // Arrowhead
+            var headLen = 5;
+            var angle = Math.atan2(ay, ax);
+            ctx.beginPath();
+            ctx.moveTo(bounce.position.x + ax * arrowLen, bounce.position.y + ay * arrowLen);
+            ctx.lineTo(
+                bounce.position.x + ax * arrowLen - headLen * Math.cos(angle - Math.PI / 6),
+                bounce.position.y + ay * arrowLen - headLen * Math.sin(angle - Math.PI / 6)
+            );
+            ctx.lineTo(
+                bounce.position.x + ax * arrowLen - headLen * Math.cos(angle + Math.PI / 6),
+                bounce.position.y + ay * arrowLen - headLen * Math.sin(angle + Math.PI / 6)
+            );
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+    });
+    ctx.restore();
 }
 
 // ─── Training / Headless loop ────────────────────────────────────────────────
