@@ -1295,9 +1295,9 @@ function draw() {
     playersArray
         .filter((p) => p.team.id !== 0)
         .forEach((p, i) => {
-            if (p.bot) p.bot(p, { inputArray: arrayRec[i][1] });
+            if (p.bot) p.bot(p, { inputArray: arrayRec[i] ? arrayRec[i][1] : [] });
             resolvePlayerMovement(p);
-            inputArrayCurr[i][1][currentFrame] = p.inputs;
+            if (inputArrayCurr[i]) inputArrayCurr[i][1][currentFrame] = p.inputs;
         });
 
     discs.forEach((d) => {
