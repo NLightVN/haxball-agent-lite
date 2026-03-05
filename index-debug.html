@@ -82,16 +82,27 @@
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"
         onload="console.log('7. onnxruntime-web loaded')"
         onerror="console.error('ERROR: onnxruntime-web CDN failed')"></script>
-    <script src="ppo_bot.js" onload="console.log('8. ppo_bot.js loaded')"
+    <script src="ppo_bot.js" onload="console.log('8. ppo_bot.js (A1) loaded')"
         onerror="console.error('ERROR: ppo_bot.js failed')"></script>
+    <script src="ppo_bot_b0.js" onload="console.log('9. ppo_bot_b0.js (B0) loaded')"
+        onerror="console.error('ERROR: ppo_bot_b0.js failed')"></script>
 
     <script>
         console.log('=== ALL SCRIPTS LOADED ===');
         setTimeout(() => {
             console.log('Canvas:', document.getElementById('canvas_div'));
             console.log('Players:', typeof playersArray !== 'undefined' ? playersArray.length : 'UNDEFINED');
-            console.log('PPOBot ready:', typeof PPOBot !== "undefined" ? PPOBot.loaded : "NOT LOADED");
-            console.log('💡 Add AI bot: AgentAPI.addBot("A1", 1, ppoBot)');
+            console.log('PPOBot (A1) ready:', typeof PPOBot    !== "undefined" ? PPOBot.loaded    : "NOT LOADED");
+            console.log('PPOBotB0   ready:', typeof PPOBotB0  !== "undefined" ? PPOBotB0.loaded  : "NOT LOADED");
+            console.log('');
+            console.log('━━━━━━━━━━ SOLO MODE (B0 defends) ━━━━━━━━━━');
+            console.log('Step 1 — Export model (run once in terminal):');
+            console.log('  python export_onnx_b0.py');
+            console.log('');
+            console.log('Step 2 — Add B0 as opponent (console):');
+            console.log('  AgentAPI.addBot("B0", 1, ppoBotB0)  // B0 = RED, you play BLUE');
+            console.log('  AgentAPI.addBot("B0", 2, ppoBotB0)  // B0 = BLUE, you play RED');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         }, 2000);
     </script>
 </body>
