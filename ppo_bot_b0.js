@@ -21,19 +21,19 @@ window.PPOBotB0 = (() => {
         Input.UP,                       // 3: up
         Input.DOWN,                     // 4: down
         Input.RIGHT | Input.UP,         // 5: up-right
-        Input.LEFT  | Input.UP,         // 6: up-left
+        Input.LEFT | Input.UP,         // 6: up-left
         Input.RIGHT | Input.DOWN,       // 7: down-right
-        Input.LEFT  | Input.DOWN,       // 8: down-left
+        Input.LEFT | Input.DOWN,       // 8: down-left
     ];
 
     const FRAME_SKIP = 6;
-    const OBS_DIM    = 106;
-    const N_DIR      = 9;
-    const N_KICK     = 2;
+    const OBS_DIM = 106;
+    const N_DIR = 9;
+    const N_KICK = 2;
 
-    let session  = null;
-    let loaded   = false;
-    let loading  = false;
+    let session = null;
+    let loaded = false;
+    let loading = false;
 
     const playerState = new WeakMap();
 
@@ -67,7 +67,7 @@ window.PPOBotB0 = (() => {
     async function runInference(obsArray) {
         if (!session) return null;
         try {
-            const tensor  = new ort.Tensor('float32', new Float32Array(obsArray), [1, OBS_DIM]);
+            const tensor = new ort.Tensor('float32', new Float32Array(obsArray), [1, OBS_DIM]);
             const results = await session.run({ obs: tensor });
             return results.logits.data;
         } catch (e) {
@@ -77,6 +77,11 @@ window.PPOBotB0 = (() => {
     }
 
     function update(player) {
+        // Lazy-load model on first bot activation (only if not already loading/loaded)
+        if (!loaded && !loading) {
+            load();
+            return;
+        }
         if (!loaded) return;
 
         if (!playerState.has(player)) {
@@ -95,7 +100,7 @@ window.PPOBotB0 = (() => {
                 runInference(obs).then(logits => {
                     state.inferring = false;
                     if (!logits) return;
-                    const dirIdx  = argmax(logits, 0,     N_DIR);
+                    const dirIdx = argmax(logits, 0, N_DIR);
                     const kickIdx = argmax(logits, N_DIR, N_KICK);
                     let input = DIR_INPUT[dirIdx] || 0;
                     if (kickIdx === 1) input |= Input.SHOOT;
@@ -105,8 +110,8 @@ window.PPOBotB0 = (() => {
         }
     }
 
-    // Auto-load on script start
-    load();
+    // No auto-load — model loads lazily when addBot() first calls update()
+    // To pre-load manually: PPOBotB0.load('models/b0_best.onnx')
 
     return { get loaded() { return loaded; }, update, load };
 })();
