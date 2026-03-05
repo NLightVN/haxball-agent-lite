@@ -85,9 +85,11 @@ def parse_args():
     p.add_argument("--phase",    default="A0",   help="A0 or A1 (default: A0)")
     p.add_argument("--episodes", default=100,    type=int,   help="Number of episodes")
     p.add_argument("--render",      action="store_true",        help="Show ASCII field")
-    p.add_argument("--delay",        default=0.05,   type=float, help="Seconds per frame (default 0.05)")
+    p.add_argument("--delay",        default=0.016,  type=float, help="Seconds per frame when rendering (default 0.016 = 60fps, 0 = max speed)")
+    p.add_argument("--speed",        default=1,      type=int,   help="Only render every Nth step (1=every step, 4=4x faster, 0=no render delay)")
     p.add_argument("--goal-scale",   default=1.0,    type=float, help="Multiply goal_y after reset (e.g. 0.5 = half-width goal)")
     p.add_argument("--deterministic", action="store_true", default=True)
+    p.add_argument("--no-print",  action="store_true", help="Suppress per-episode prints (max throughput)")
     return p.parse_args()
 
 
@@ -132,10 +134,11 @@ def main():
             elif truncated:
                 result = "timeout"
 
-            if args.render:
+            if args.render and (ep_len % max(args.speed, 1) == 0):
                 render_frame(env, ep_len, reward, ep_reward,
                              f"← {result.upper()}" if done else "")
-                time.sleep(args.delay)
+                if args.delay > 0:
+                    time.sleep(args.delay)
 
         rewards.append(ep_reward)
         ep_lengths.append(ep_len)
@@ -143,7 +146,7 @@ def main():
         elif result == "timeout": timeouts    += 1
         elif result == "own_goal": own_goals  += 1
 
-        if not args.render:
+        if not args.render and not args.no_print:
             bar = "✅" if result == "goal" else ("⏱" if result == "timeout" else "❌")
             print(f"  Ep {ep+1:4d} {bar} | {result:8s} | rew {ep_reward:+.3f} | steps {ep_len}")
 
