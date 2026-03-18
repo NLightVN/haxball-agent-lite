@@ -177,3 +177,162 @@ canvas {
   font-weight: bold;
   cursor: pointer;
 }
+
+/* ── Copilot Usage Counter (in the top bar) ────────────────────────────────── */
+.bar-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.copilot-usage-bar {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background-color: #1A2125;
+    padding: 5px 10px;
+    border-radius: 0 0 5px 5px;
+    font: 900 14px Arial Black, Arial Bold, Gadget, sans-serif;
+    color: white;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.copilot-usage-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.copilot-usage-label {
+    color: #a0aec0;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+}
+
+.copilot-usage-count {
+    color: #90cdf4;
+    font-size: 20px;
+    min-width: 28px;
+    text-align: center;
+    transition: transform 0.15s ease;
+}
+
+.copilot-usage-count.bump {
+    transform: scale(1.4);
+}
+
+.copilot-usage-unit {
+    color: #a0aec0;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+.copilot-reset-btn,
+.copilot-settings-btn {
+    background: none;
+    border: 1px solid #4a5f7a;
+    color: #a0aec0;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 14px;
+    cursor: pointer;
+    line-height: 1.4;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.copilot-reset-btn:hover,
+.copilot-settings-btn:hover {
+    background-color: #2d3e50;
+    color: white;
+}
+
+/* ── Copilot Settings Modal ─────────────────────────────────────────────────── */
+.copilot-settings-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.65);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.copilot-settings-box {
+    background-color: #1A2125;
+    border: 1px solid #4a5f7a;
+    border-radius: 10px;
+    padding: 24px 28px;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.copilot-settings-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: white;
+    margin: 0;
+}
+
+.copilot-settings-desc {
+    font-size: 13px;
+    color: #a0aec0;
+    line-height: 1.55;
+}
+
+.copilot-settings-desc strong {
+    color: #90cdf4;
+}
+
+.copilot-settings-desc code {
+    background-color: #2d3e50;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #90cdf4;
+}
+
+.copilot-token-input {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: #0d1117;
+    border: 1px solid #4a5f7a;
+    border-radius: 6px;
+    color: white;
+    font-family: monospace;
+    font-size: 13px;
+    padding: 8px 10px;
+    outline: none;
+}
+
+.copilot-token-input:focus {
+    border-color: #90cdf4;
+}
+
+.copilot-settings-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.copilot-settings-hint {
+    font-size: 12px;
+    color: #718096;
+    line-height: 1.6;
+}
+
+.copilot-settings-hint code {
+    display: block;
+    background-color: #2d3e50;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 11px;
+    color: #90cdf4;
+    margin-top: 4px;
+    word-break: break-all;
+}

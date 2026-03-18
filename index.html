@@ -25,6 +25,41 @@
                 <span class="digit">0</span>
             </div>
         </div>
+
+        <!-- Copilot usage counter (top-right of bar) -->
+        <div class="copilot-usage-bar" title="Số lượt đã dùng GitHub Copilot trong phiên này">
+            <span class="copilot-usage-icon">🤖</span>
+            <span class="copilot-usage-label">Copilot</span>
+            <span id="copilot-usage-count" class="copilot-usage-count">0</span>
+            <span class="copilot-usage-unit">lượt</span>
+            <button class="copilot-reset-btn" onclick="CopilotUsageTracker.reset()" title="Reset counter">↺</button>
+            <button class="copilot-settings-btn" onclick="CopilotSettings.openPanel()" title="Cài đặt GitHub Token">⚙</button>
+        </div>
+    </div>
+
+    <!-- Copilot Settings Panel (modal) -->
+    <div id="copilot-settings-panel" class="copilot-settings-overlay" style="display:none">
+        <div class="copilot-settings-box">
+            <h3 class="copilot-settings-title">🤖 GitHub Copilot Bot</h3>
+            <p class="copilot-settings-desc">
+                Nhập <strong>GitHub Personal Access Token</strong> để dùng Copilot làm AI bot.<br>
+                Token cần scope <code>models:read</code> (GitHub Models API).
+            </p>
+            <label for="copilot-token-input" class="copilot-settings-desc" style="margin:0">
+                GitHub Personal Access Token
+            </label>
+            <input id="copilot-token-input" class="copilot-token-input"
+                   type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                   autocomplete="off" />
+            <div class="copilot-settings-actions">
+                <button class="btn map-btn" onclick="CopilotSettings.saveFromPanel()">💾 Lưu</button>
+                <button class="btn map-btn" onclick="CopilotSettings.closePanel()">✕ Đóng</button>
+            </div>
+            <p class="copilot-settings-hint">
+                Sau khi lưu, mở DevTools console và chạy:<br>
+                <code>new CopilotBot(1, 1, CopilotSettings.getToken()).start()</code>
+            </p>
+        </div>
     </div>
 
     <!-- Map Loader Section -->
@@ -51,6 +86,7 @@
     <script defer src="script.js"></script>
     <script defer src="agent-api.js"></script>
     <script defer src="enhanced-bot.js"></script>
+    <script defer src="copilot-bot.js"></script>
 </body>
 
 </html>
