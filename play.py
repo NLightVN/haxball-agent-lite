@@ -1,17 +1,13 @@
 """
-eval_render.py — Visual evaluation: watch a trained A1 model play against A0 / bots.
-
-Usage:
-    python eval_render.py --a1-model models/a1_best --a0-model models/a0_final
-    python eval_render.py --a1-model models/a1_best --a0-model models/a0_final --opponent Defender
-    python eval_render.py --a1-model models/a1_best --opponent human   # YOU control the opponent!
+play.py — Interactive Play
+Watch or play against the AI in a pure Python environment.
 
 Controls (while window is open):
     SPACE   — pause / resume
     R       — restart episode immediately
     Q / ESC — quit
 
-Human opponent controls (--opponent human):
+Human opponent controls (OPPONENT="Human"):
     Arrow keys      — move
     Enter / RCtrl   — kick
 """
@@ -27,11 +23,11 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH = "models/a1_final.zip"   # Path to A1 model .zip
-A0_MODEL_PATH = None                    # Path to A0 model .zip (used as opponent if Opponent is Trained)
-OPPONENT = "Defender"                   # Defender | Attacker | Hybrid | Follower | Trained | random | human
-GOAL_SIZE = 65.0                        # Goal half-height in physics units
-DETERMINISTIC = True                    # Use deterministic policy actions
+A1_MODEL_PATH = "models/a1.2_checkpoints/snapshot_2000000.zip"   # Thay model thành bản snapshot_3000000 của A0
+A0_MODEL_PATH = None                    # Path to A0 model .zip (used as opponent if OPPONENT is 'Trained')
+OPPONENT = "Human"                  # Defender | Attacker | Hybrid | Follower | Trained | random | Human
+GOAL_SIZE = 64.0                        # Goal half-height in physics units
+DETERMINISTIC = False                   # Use deterministic policy actions
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
@@ -41,7 +37,7 @@ except ModuleNotFoundError:
     sys.exit(1)
 
 from stable_baselines3 import PPO
-from training.env import HaxballCurriculumEnv, DIR_MAP, KICK_STR, POLE_R
+from training.env import HaxballCurriculumEnv, DIR_MAP, KICK_STR, POLE_R, _dist_to_goal_segment
 
 # ── Display constants ──────────────────────────────────────────────────────────
 WIN_W      = 1000
@@ -211,7 +207,7 @@ def draw_ball(screen, env, surf_rect):
         pygame.draw.line(screen, (*C_BALL, 60), (sx, sy), (tx, ty), max(1, r // 2))
 
 
-def draw_panel(screen, env, step, ep_reward, episode, total_eps,
+def draw_panel(screen, env, step, ep_reward, step_reward, episode, total_eps,
                result_str, paused, opp_type):
     panel_rect = pygame.Rect(0, 0, WIN_W, PANEL_H)
     pygame.draw.rect(screen, C_PANEL, panel_rect)
@@ -245,6 +241,12 @@ def draw_panel(screen, env, step, ep_reward, episode, total_eps,
         surf = FONT_SM.render(line, True, C_DIM)
         screen.blit(surf, (WIN_W - surf.get_width() - 14, 8 + i * 18))
 
+    # Step reward bar (center-bottom of panel)
+    rew_color = C_WIN if step_reward > 0.0001 else (C_LOSE if step_reward < -0.0001 else C_DIM)
+    rew_str = f"Step rew: {step_reward:+.5f}"
+    rew_surf = FONT_SM.render(rew_str, True, rew_color)
+    screen.blit(rew_surf, (WIN_W // 2 - rew_surf.get_width() // 2, PANEL_H - 44))
+
     # Result flash
     if result_str:
         color = C_WIN if "WIN" in result_str or "GOAL" in result_str else C_LOSE
@@ -273,14 +275,14 @@ def main():
 
     pygame.init()
     screen = pygame.display.set_mode((WIN_W, WIN_H))
-    pygame.display.set_caption("Haxball — A1 Eval")
+    pygame.display.set_caption("Haxball — A1.2 Eval")
     clock = pygame.time.Clock()
     init_fonts()
 
     # Field surface rect (below panel, with 5px margin)
     field_rect = pygame.Rect(5, PANEL_H + 5, WIN_W - 10, FIELD_H)
 
-    env = HaxballCurriculumEnv(phase="A1")
+    env = HaxballCurriculumEnv(phase="A1.2")
     if A0_MODEL_PATH:
         env.a0_model_path = A0_MODEL_PATH
 
@@ -307,14 +309,31 @@ def main():
         return (float(dx), float(dy), kick)
 
     def do_reset():
-        obs, _ = env.reset()
-        env.goal_y = GOAL_SIZE   # override curriculum goal size
-        return obs
+        env.reset()
+        env.team_id      = 1
+        env._flip        = 1.0
+        env._attack_sign = 1
+        env._reset_positions()
+        import math as _math
+        a = env.agents[0]
+        env._prev_dist_to_ball = _math.hypot(a.x - env.ball.x, a.y - env.ball.y)
+        env._min_dist_to_ball = env._prev_dist_to_ball
+        goal_x = env.HW * env._attack_sign
+        # Use segment formula consistent with the current training phase
+        env._prev_ball_dist_to_goal = _dist_to_goal_segment(
+            env.ball.x, env.ball.y,
+            goal_x, env.goal_y, 0.9 * env.goal_y
+        )
+        env._prev_ball_speed = _math.hypot(env.ball.xs, env.ball.ys)
+        env.last_touch = None
+        env.step_count = 0
+        env.scores = [0, 0]
+        return env._get_obs()
 
     # ── Physics timing ────────────────────────────────────────────────────────
     # Each env.step() = FRAME_SKIP=6 ticks @ 60Hz → 100ms per step = 10 steps/s
     RENDER_FPS    = 60
-    STEP_INTERVAL = 1.0 / 10.0   # 100 ms → real HaxBall speed
+    STEP_INTERVAL = 1.0 / 20.0   # 20 steps/s
 
     paused          = False
     running         = True
@@ -324,9 +343,10 @@ def main():
     post_done_until = 0.0        # wait this long before resetting after match ends
     waiting_reset   = False
 
-    obs       = do_reset()
-    ep_reward = 0.0
-    step_cnt  = 0
+    obs        = do_reset()
+    ep_reward  = 0.0
+    step_reward = 0.0
+    step_cnt   = 0
     last_step_t = time.time()
 
     while running:
@@ -344,6 +364,7 @@ def main():
                 elif event.key == pygame.K_r:
                     obs           = do_reset()
                     ep_reward     = 0.0
+                    step_reward   = 0.0
                     step_cnt      = 0
                     result_flash  = ""
                     flash_until   = 0.0
@@ -358,6 +379,7 @@ def main():
             if now >= post_done_until:
                 obs           = do_reset()
                 ep_reward     = 0.0
+                step_reward   = 0.0
                 step_cnt      = 0
                 result_flash  = ""
                 flash_until   = 0.0
@@ -369,7 +391,7 @@ def main():
             draw_field(screen, env, field_rect)
             draw_players(screen, env, field_rect)
             draw_ball(screen, env, field_rect)
-            draw_panel(screen, env, step_cnt, ep_reward, episode, episode + 1,
+            draw_panel(screen, env, step_cnt, ep_reward, step_reward, episode, episode + 1,
                        result_flash, False, env.opponent_type)
             pygame.display.flip()
             clock.tick(RENDER_FPS)
@@ -380,7 +402,7 @@ def main():
             draw_field(screen, env, field_rect)
             draw_players(screen, env, field_rect)
             draw_ball(screen, env, field_rect)
-            draw_panel(screen, env, step_cnt, ep_reward, episode, episode + 1,
+            draw_panel(screen, env, step_cnt, ep_reward, step_reward, episode, episode + 1,
                        result_flash if now < flash_until else "", True, env.opponent_type)
             pygame.display.flip()
             clock.tick(RENDER_FPS)
@@ -392,22 +414,17 @@ def main():
                 env.human_opponent_action = get_human_action()
             action, _ = a1_model.predict(obs, deterministic=DETERMINISTIC)
             obs, reward, terminated, truncated, _ = env.step(action)
-            ep_reward += reward
-            step_cnt  += 1
+            step_reward = reward
+            ep_reward  += reward
+            step_cnt   += 1
             last_step_t = now
 
             done = terminated or truncated
             if done:
                 if terminated:
-                    agent_score = env.scores[env.team_id - 1]
-                    opp_id      = 2 if env.team_id == 1 else 1
-                    opp_score   = env.scores[opp_id - 1]
-                    if agent_score >= 3:
-                        result_flash = f"WIN!  {agent_score} - {opp_score}"
-                    else:
-                        result_flash = f"LOSS  {agent_score} - {opp_score}"
+                    result_flash = f"GOAL!  ep_rew={ep_reward:+.2f}"
                 else:
-                    result_flash = f"TIMEOUT  {env.scores[0]}-{env.scores[1]}"
+                    result_flash = f"TIMEOUT  ep_rew={ep_reward:+.2f}"
                 flash_until     = now + 10.0   # show flash until reset
                 post_done_until = now + 2.0    # auto-reset after 2 s
                 waiting_reset   = True
@@ -417,7 +434,7 @@ def main():
         draw_field(screen, env, field_rect)
         draw_players(screen, env, field_rect)
         draw_ball(screen, env, field_rect)
-        draw_panel(screen, env, step_cnt, ep_reward, episode, episode + 1,
+        draw_panel(screen, env, step_cnt, ep_reward, step_reward, episode, episode + 1,
                    result_flash if now < flash_until else "", paused, env.opponent_type)
         pygame.display.flip()
         clock.tick(RENDER_FPS)

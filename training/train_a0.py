@@ -6,6 +6,8 @@ Train A0 only — 1 agent, no opponent, score into right goal.
 """
 
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
