@@ -672,29 +672,33 @@ class HaxballCurriculumEnv(gym.Env):
         agents = self.agents
         HW, HH = self.HW, self.HH
 
-        # 1. Kick (before movement)
-        for i, ag in enumerate(agents):
-            if i < len(agent_actions):
-                dx, dy, kick = agent_actions[i]
-                if kick:
-                    dx_b = ball.x - ag.x
-                    dy_b = ball.y - ag.y
-                    dist = math.hypot(dx_b, dy_b)
-                    if dist > 0 and dist - ag.radius - ball.radius < KICK_RANGE:
-                        nx, ny = dx_b / dist, dy_b / dist
-                        ball.xs += nx * KICK_STR
-                        ball.ys += ny * KICK_STR
+        # Randomize agent action order each tick to prevent systematic first-mover advantage
+        action_order = list(range(len(agent_actions)))
+        self._rng.shuffle(action_order)
 
-        # 2. Acceleration
-        for i, ag in enumerate(agents):
-            if i < len(agent_actions):
-                dx, dy, kick = agent_actions[i]
-                ln = math.hypot(dx, dy)
-                acc = PLYR_KICK_ACC if kick else PLYR_ACC
-                if ln > 0:
-                    ndx, ndy = dx / ln, dy / ln
-                    ag.xs += ndx * acc
-                    ag.ys += ndy * acc
+        # 1. Kick (before movement) — random order
+        for i in action_order:
+            ag = agents[i]
+            dx, dy, kick = agent_actions[i]
+            if kick:
+                dx_b = ball.x - ag.x
+                dy_b = ball.y - ag.y
+                dist = math.hypot(dx_b, dy_b)
+                if dist > 0 and dist - ag.radius - ball.radius < KICK_RANGE:
+                    nx, ny = dx_b / dist, dy_b / dist
+                    ball.xs += nx * KICK_STR
+                    ball.ys += ny * KICK_STR
+
+        # 2. Acceleration — random order
+        for i in action_order:
+            ag = agents[i]
+            dx, dy, kick = agent_actions[i]
+            ln = math.hypot(dx, dy)
+            acc = PLYR_KICK_ACC if kick else PLYR_ACC
+            if ln > 0:
+                ndx, ndy = dx / ln, dy / ln
+                ag.xs += ndx * acc
+                ag.ys += ndy * acc
 
         # 3. Move all
         ball.x += ball.xs; ball.y += ball.ys
