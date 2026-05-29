@@ -14,6 +14,9 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback, CallbackList
 
 from training.env import HaxballCurriculumEnv
+from utils.model_logger import get_model_logger
+
+log = get_model_logger("a0")
 
 # ── Hyperparameters ────────────────────────────────────────────────────────────
 N_ENVS          = 8          # parallel envs
@@ -22,9 +25,9 @@ CHECKPOINT_FREQ = 50_000     # save every N steps (across all envs)
 TARGET_REWARD   = 3.0        # stop early when ep_rew_mean >= this
 # ── PPO config ─────────────────────────────────────────────────────────────────
 PPO_PARAMS = dict(
-    n_steps      = 512,    # rollout buffer per env
-    batch_size   = 256,
-    n_epochs     = 8,
+    n_steps      = 2048,    # rollout buffer per env
+    batch_size   = 512,
+    n_epochs     = 10,
     gamma        = 0.99,
     gae_lambda   = 0.95,
     ent_coef     = 0.02,   # encourage exploration
@@ -32,6 +35,7 @@ PPO_PARAMS = dict(
     clip_range   = 0.2,
     vf_coef      = 0.5,
     max_grad_norm= 0.5,
+    policy_kwargs= dict(net_arch=dict(pi=[256, 256], vf=[256, 256]))
 )
 
 
@@ -55,12 +59,12 @@ class A0MonitorCallback(BaseCallback):
             self.best_reward = rew
             self.model.save(self.best_path)
             if self.verbose:
-                print(f"[A0] ✨ New best reward: {rew:.3f}  → saved to {self.best_path}.zip")
+                log.info(f"[A0] ✨ New best reward: {rew:.3f}  → saved to {self.best_path}.zip")
 
         # Early stop
         if rew >= self.target_reward:
-            print(f"\n[A0] 🎯 Target reached! ep_rew_mean={rew:.3f} >= {self.target_reward}")
-            print(f"[A0] Best model at: {self.best_path}.zip")
+            log.info(f"[A0] 🎯 Target reached! ep_rew_mean={rew:.3f} >= {self.target_reward}")
+            log.info(f"[A0] Best model at: {self.best_path}.zip")
             return False  # stops training
 
         return True
@@ -95,9 +99,9 @@ if __name__ == "__main__":
         verbose       = 1,
     )
 
-    print(f"[A0] Starting training — {N_ENVS} envs, up to {TOTAL_STEPS:,} steps")
-    print(f"[A0] Checkpoints: models/a0_checkpoints/  |  Best: models/a0_best.zip")
-    print(f"[A0] Tensorboard: tensorboard/a0/\n")
+    log.info(f"[A0] Starting training — {N_ENVS} envs, up to {TOTAL_STEPS:,} steps")
+    log.info(f"[A0] Checkpoints: models/a0_checkpoints/  |  Best: models/a0_best.zip")
+    log.info(f"[A0] Tensorboard: tensorboard/a0/")
 
     model.learn(
         total_timesteps = TOTAL_STEPS,
@@ -108,4 +112,4 @@ if __name__ == "__main__":
     # Final save (if not early-stopped)
     final_path = "models/a0_final"
     model.save(final_path)
-    print(f"\n[A0] Training complete. Final model: {final_path}.zip")
+    log.info(f"[A0] Training complete. Final model: {final_path}.zip")

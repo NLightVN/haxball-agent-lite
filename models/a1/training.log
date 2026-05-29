@@ -1,0 +1,57 @@
+2026-05-30 01:56:14 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\models\a1\training.log
+2026-05-30 01:56:14 [INFO] [SelfPlay] Loading pretrained A0 weights from models/a0.1_checkpoints/a0.1_snapshot_5000000.zip
+2026-05-30 01:57:46 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\models\a1\training.log
+2026-05-30 01:57:46 [INFO] [SelfPlay] Loading pretrained A0 weights from models/a0.1_checkpoints/a0.1_snapshot_5000000.zip
+2026-05-30 01:57:48 [INFO] [SelfPlay] Starting — 8 envs, 30,000,000 steps to go
+2026-05-30 01:57:48 [INFO] [SelfPlay] Priority: 50% snapshot category, 50% bot category (Wanderer/Pazzo/Random/Static)
+2026-05-30 02:02:00 [INFO] [SelfPlay] Saved snapshot to models/a1_checkpoints\snapshot_1000000.zip
+2026-05-30 02:02:00 [INFO] [SelfPlay] Loading opponent 'snapshot_1000000' from models/a1_checkpoints\snapshot_1000000.zip into memory...
+2026-05-30 02:02:00 [INFO] 
+--- SelfPlay Opponent Winrates ---
+2026-05-30 02:02:00 [INFO] Agent Pool: snapshot_1000000
+2026-05-30 02:02:00 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-05-30 02:02:00 [INFO] Terminated Pool: 
+2026-05-30 02:02:00 [INFO] Stats:
+2026-05-30 02:02:00 [INFO]   snapshot_1000000: No matches yet
+2026-05-30 02:02:00 [INFO] ----------------------------------
+2026-05-30 02:02:02 [INFO] [SelfPlay] Opponent 'snapshot_1000000' winrate 0.050 < 0.05 after 101 matches. Moving to terminated pool.
+2026-05-30 02:05:11 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\models\a1\training.log
+2026-05-30 02:05:11 [INFO] [SelfPlay] Loading pretrained A0 weights from models/a0.1_checkpoints/a0.1_snapshot_5000000.zip
+2026-05-30 02:05:12 [INFO] [SelfPlay] Starting — 8 envs, 30,000,000 steps to go
+2026-05-30 02:05:12 [INFO] [SelfPlay] Priority: 50% snapshot category, 50% bot category (Wanderer/Pazzo/Random/Static)
+2026-05-30 02:09:27 [INFO] [SelfPlay] Saved snapshot to models/a1_checkpoints\snapshot_1000000.zip
+2026-05-30 02:09:27 [INFO] [SelfPlay] Loading opponent 'snapshot_1000000' from models/a1_checkpoints\snapshot_1000000.zip into memory...
+2026-05-30 02:09:27 [INFO] 
+--- SelfPlay Opponent Winrates ---
+2026-05-30 02:09:27 [INFO] Agent Pool: snapshot_1000000
+2026-05-30 02:09:27 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-05-30 02:09:27 [INFO] Terminated Pool: 
+2026-05-30 02:09:27 [INFO] Stats:
+2026-05-30 02:09:27 [INFO]   snapshot_1000000: No matches yet
+2026-05-30 02:09:27 [INFO] ----------------------------------
+2026-05-30 02:09:27 [INFO] [SelfPlay] Opponent 'snapshot_1000000' winrate 0.048 < 0.05 after 21 matches. Moving to terminated pool.
+2026-05-30 02:23:21 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\models\a1\training.log
+2026-05-30 02:23:21 [INFO] [SelfPlay] Loading pretrained A0 weights from models/a0.1_checkpoints/a0.1_snapshot_5000000.zip
+2026-05-30 02:23:22 [INFO] [SelfPlay] Starting — 8 envs, 30,000,000 steps to go
+2026-05-30 02:23:22 [INFO] [SelfPlay] Priority: 50% snapshot category, 50% bot category (Wanderer/Pazzo/Random/Static)
+2026-05-30 02:33:28 [INFO] [SelfPlay] Saved snapshot to models/a1_checkpoints\snapshot_1000000.zip
+2026-05-30 02:33:28 [INFO] [SelfPlay] Loading opponent 'snapshot_1000000' from models/a1_checkpoints\snapshot_1000000.zip into memory...
+2026-05-30 02:33:28 [INFO] 
+--- SelfPlay Opponent Winrates ---
+2026-05-30 02:33:28 [INFO] Agent Pool: snapshot_1000000
+2026-05-30 02:33:28 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-05-30 02:33:28 [INFO] Terminated Pool: 
+2026-05-30 02:33:28 [INFO] Stats:
+2026-05-30 02:33:28 [INFO]   snapshot_1000000: No matches yet
+2026-05-30 02:33:28 [INFO] ----------------------------------
+2026-05-30 02:33:28 [INFO] [SelfPlay] Opponent 'snapshot_1000000' winrate 0.000 < 0.05 after 20 matches. Moving to terminated pool.
+2026-05-30 02:44:14 [INFO] Logger initialised — writing to E:\Tran Quang Hung\haxball-agent-lite\models\a1\training.log
+2026-05-30 02:44:14 [INFO] [SelfPlay] Resuming from models/a1_checkpoints/snapshot_1000000.zip
+2026-05-30 02:44:15 [INFO] [SelfPlay] Found 1 existing snapshots on disk — reloading into opponent pool...
+2026-05-30 02:44:15 [INFO] [SelfPlay] Loading opponent 'snapshot_1000000' from models/a1_checkpoints\snapshot_1000000.zip into memory...
+2026-05-30 02:44:15 [INFO] [SelfPlay] Reloaded opponent 'snapshot_1000000'
+2026-05-30 02:44:15 [INFO] [SelfPlay] Resuming from step 1,000,000 — 29,000,000 steps remaining
+2026-05-30 02:44:15 [INFO] [SelfPlay] Starting — 8 envs, 29,000,000 steps to go
+2026-05-30 02:44:15 [INFO] [SelfPlay] Priority: 50% snapshot category, 50% bot category (Wanderer/Pazzo/Random/Static)
+2026-05-30 02:44:15 [INFO] [SelfPlay] Resume: 1 existing snapshots, next snapshot at step 3,000,000
+2026-05-30 02:44:16 [INFO] [SelfPlay] Opponent 'snapshot_1000000' winrate 0.049 < 0.05 after 61 matches. Moving to terminated pool.

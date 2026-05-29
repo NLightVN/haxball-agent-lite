@@ -23,11 +23,11 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH = "models/a1.2_checkpoints/snapshot_2000000.zip"   # Thay model thành bản snapshot_3000000 của A0
+A1_MODEL_PATH = "models/a1_checkpoints/snapshot_1000000.zip"   # Bản snapshot 1M vừa mới xuất hiện
 A0_MODEL_PATH = None                    # Path to A0 model .zip (used as opponent if OPPONENT is 'Trained')
-OPPONENT = "Human"                  # Defender | Attacker | Hybrid | Follower | Trained | random | Human
+OPPONENT = "Human"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
 GOAL_SIZE = 64.0                        # Goal half-height in physics units
-DETERMINISTIC = False                   # Use deterministic policy actions
+DETERMINISTIC = True                # Use deterministic policy actions
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
@@ -270,19 +270,19 @@ def draw_panel(screen, env, step, ep_reward, step_reward, episode, total_eps,
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
-    print(f"Loading A1 model: {A1_MODEL_PATH}")
+    print(f"Loading model: {A1_MODEL_PATH}")
     a1_model = PPO.load(A1_MODEL_PATH, device="cpu")
 
     pygame.init()
     screen = pygame.display.set_mode((WIN_W, WIN_H))
-    pygame.display.set_caption("Haxball — A1.2 Eval")
+    pygame.display.set_caption("Haxball — A0.1 Play")
     clock = pygame.time.Clock()
     init_fonts()
 
     # Field surface rect (below panel, with 5px margin)
     field_rect = pygame.Rect(5, PANEL_H + 5, WIN_W - 10, FIELD_H)
 
-    env = HaxballCurriculumEnv(phase="A1.2")
+    env = HaxballCurriculumEnv(phase="A1")
     if A0_MODEL_PATH:
         env.a0_model_path = A0_MODEL_PATH
 
@@ -310,9 +310,9 @@ def main():
 
     def do_reset():
         env.reset()
-        env.team_id      = 1
-        env._flip        = 1.0
-        env._attack_sign = 1
+        env.team_id      = 2
+        env._flip        = -1.0
+        env._attack_sign = -1
         env._reset_positions()
         import math as _math
         a = env.agents[0]
