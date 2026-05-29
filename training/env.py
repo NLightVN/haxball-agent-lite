@@ -319,8 +319,10 @@ class HaxballCurriculumEnv(gym.Env):
                 # External override: always use this opponent type (e.g. 'Human' from eval_render)
                 self.episode_type    = 'opponent'
                 self.opponent_type   = self.forced_opponent_type
-                self.opponent_policy = None
                 self.goal_y = 64.0
+                # Only clear policy if not Trained — eval scripts may inject opponent_policy externally
+                if self.forced_opponent_type != 'Trained':
+                    self.opponent_policy = None
             elif self.phase == 'A0.1':
                 self.episode_type = 'opponent'
                 if getattr(self, 'total_timesteps_elapsed', 0) < 5_000_000:
@@ -346,7 +348,9 @@ class HaxballCurriculumEnv(gym.Env):
                 self.episode_type = 'opponent'
                 self.goal_y = 64.0
                 self.opponent_type = 'Trained'
-                self.opponent_policy = None
+                # Only reset policy if not externally forced (e.g. eval/play scripts set forced_opponent_type)
+                if self.forced_opponent_type is None:
+                    self.opponent_policy = None
                 
             elif self._rng.random() < A1_PRECISION_RATIO:
                 # PRECISION episode: small-medium goal, no opponent (20%)
@@ -698,7 +702,10 @@ class HaxballCurriculumEnv(gym.Env):
             ag.x += ag.xs; ag.y += ag.ys
 
         # 4. Disc-Disc collisions (Players and Ball)
-        all_discs = [ball] + agents
+        # Randomize collision order each tick to prevent systematic agents[0] advantage
+        shuffled_agents = list(agents)
+        self._rng.shuffle(shuffled_agents)
+        all_discs = [ball] + shuffled_agents
         n = len(all_discs)
         
         # Track touches in this tick
