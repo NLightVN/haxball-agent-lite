@@ -137,6 +137,8 @@ class SelfPlayEnv(HaxballCurriculumEnv):
                 self.opponent_policy = policy
             
     def step(self, action):
+        # Capture opponent for this episode before env.step() can reset and resample.
+        opponent_name = self.current_opponent_name
         obs, reward, terminated, truncated, info = super().step(action)
         
         if terminated or truncated:
@@ -145,10 +147,10 @@ class SelfPlayEnv(HaxballCurriculumEnv):
             agent_score = self.scores[self.team_id - 1]
             opp_score = self.scores[2 - self.team_id]
             
-            if self.episode_type == 'opponent' and self.current_opponent_name is not None:
+            if self.episode_type == 'opponent' and opponent_name is not None:
                 if agent_score != opp_score:
                     agent_won = (agent_score > opp_score)
-                    self.opponent_manager.update_result(self.current_opponent_name, agent_won)
+                    self.opponent_manager.update_result(opponent_name, agent_won)
                     
         return obs, reward, terminated, truncated, info
 

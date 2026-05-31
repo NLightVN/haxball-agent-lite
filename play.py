@@ -331,9 +331,9 @@ def main():
         return env._get_obs()
 
     # ── Physics timing ────────────────────────────────────────────────────────
-    # Each env.step() = FRAME_SKIP=6 ticks @ 60Hz → 100ms per step = 10 steps/s
+    # Each env.step() = frame_skip=3 ticks @ 60Hz → 50ms per step = 20 steps/s
     RENDER_FPS    = 60
-    STEP_INTERVAL = 1.0 / 20.0   # 20 steps/s
+    STEP_INTERVAL = 1.0 / 20.0   # 20 steps/s  (3 ticks × 60Hz = correct real-time)
 
     paused          = False
     running         = True

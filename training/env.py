@@ -163,7 +163,7 @@ class HaxballCurriculumEnv(gym.Env):
         self.legacy_obs = legacy_obs
         self._rng = np.random.default_rng(seed)
         
-        self.frame_skip = 3 if self.phase in ('A1.2', 'A0.1') else FRAME_SKIP
+        self.frame_skip = 3 if self.phase in ('A1.2', 'A0.1', 'A1') else FRAME_SKIP
 
         # Gymnasium spaces
         self.obs_dim = 100 if self.legacy_obs else OBS_DIM
@@ -589,13 +589,15 @@ class HaxballCurriculumEnv(gym.Env):
         else: # A1 or A1.2 Phase
             # Goal logic
             goal_scored = False
-            if goal_result == 2:
+            agent_goal = 2 if self._attack_sign == 1 else 1
+            
+            if goal_result == agent_goal:
                 # Agent scored
                 self.scores[self.team_id - 1] += 1
                 reward += 30.0
                 goal_scored = True
                 self._reset_positions()
-            elif goal_result == 1:
+            elif goal_result != 0:
                 # Opponent scored
                 opp_id = 2 if self.team_id == 1 else 1
                 self.scores[opp_id - 1] += 1
@@ -628,14 +630,16 @@ class HaxballCurriculumEnv(gym.Env):
             if self.phase == 'A0.1':
                 # ── Reset reward and re-apply terminal signals cleanly ─────────
                 reward = 0.0
-                if goal_result == 2:
+                agent_goal = 2 if self._attack_sign == 1 else 1
+                
+                if goal_result == agent_goal:
                     # Ball entered agent's attack goal.
                     # Only reward if agent was the last to touch the ball.
                     # If opponent scored into their own goal (last_touch == 'O'), no bonus.
                     if self.last_touch != 'O':
                         reward += 5.0
                     terminated = True
-                elif goal_result == 1:
+                elif goal_result != 0:
                     # Opponent scored — re-apply penalty (was cleared by reset above)
                     reward -= 5.0
                     terminated = True
