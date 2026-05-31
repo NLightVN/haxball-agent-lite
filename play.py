@@ -23,11 +23,17 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH = "models/a1_checkpoints/snapshot_1000000.zip"   # Bản snapshot 1M vừa mới xuất hiện
-A0_MODEL_PATH = None                    # Path to A0 model .zip (used as opponent if OPPONENT is 'Trained')
-OPPONENT = "Human"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
+A1_MODEL_PATH      = "models/a1_checkpoints/snapshot_1000000.zip"  # Agent chính
+OPPONENT_MODEL_PATH = "models/a1_checkpoints/snapshot_3000000.zip" # Opponent model (dùng khi OPPONENT='Trained')
+A0_MODEL_PATH = None
+OPPONENT = "Trained"                    # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
 GOAL_SIZE = 64.0                        # Goal half-height in physics units
-DETERMINISTIC = True                # Use deterministic policy actions
+DETERMINISTIC = True                    # Use deterministic policy actions
+
+# Display labels (auto-derived from model paths)
+_stem = lambda p: os.path.splitext(os.path.basename(p))[0] if p else None
+AGENT_LABEL = _stem(A1_MODEL_PATH)   or "A1"
+OPP_LABEL   = _stem(OPPONENT_MODEL_PATH) or "OPP"
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
@@ -154,10 +160,10 @@ def draw_players(screen, env, surf_rect):
         if i == 0:
             # Agent: determine colour by team
             color = C_AGENT if env.team_id == 1 else C_OPP
-            label = "A1"
+            label = AGENT_LABEL
         else:
             color = C_OPP if env.team_id == 1 else C_AGENT
-            label = env.opponent_type[:3] if env.opponent_type else "BOT"
+            label = OPP_LABEL if env.opponent_type == 'Trained' else (env.opponent_type[:3] if env.opponent_type else "BOT")
 
         # Shadow
         shadow_surf = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
@@ -294,6 +300,11 @@ def main():
         elif opp_lower not in ("random", "none", "solo"):
             env.forced_opponent_type = OPPONENT
 
+    # ── Load opponent policy if Trained ──────────────────────────────────────
+    if OPPONENT.lower() == "trained" and OPPONENT_MODEL_PATH:
+        print(f"Loading opponent model: {OPPONENT_MODEL_PATH}")
+        env.opponent_policy = PPO.load(OPPONENT_MODEL_PATH, device="cpu")
+
     is_human_opp = OPPONENT and OPPONENT.lower() == "human"
 
     # ── Helper: read human opponent keyboard input ────────────────────────────
@@ -310,9 +321,9 @@ def main():
 
     def do_reset():
         env.reset()
-        env.team_id      = 2
-        env._flip        = -1.0
-        env._attack_sign = -1
+        env.team_id      = 1
+        env._flip        = +1.0
+        env._attack_sign = +1
         env._reset_positions()
         import math as _math
         a = env.agents[0]
