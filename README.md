@@ -1,18 +1,10 @@
 # Haxball Agent Lite ⚽🤖
 
-**Fully offline 2-player Haxball with Agent API for AI bot development**
 
-Based on [Wazarr94's Haxball Clone](https://github.com/Wazarr94/Wazarr94.github.io) - **authentic Haxball physics!**
-
----
 
 ## 🚀 Quick Start
 
-1. **Open `index.html`** in your browser
-2. Game starts immediately with 2 players!
-3. **Press F12** → Console to use Agent API
-
-No server, no dependencies, 100% offline!
+open play.py
 
 ---
 
