@@ -1,0 +1,4 @@
+2026-06-01 14:23:48 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\models\a1_pfsp\training.log
+2026-06-01 14:23:48 [INFO] [SelfPlay] Loading pretrained A0 weights from models/a0.1_checkpoints/a0.1_snapshot_3500000.zip
+2026-06-01 14:23:50 [INFO] [SelfPlay] Starting — 8 envs, 30,000,000 steps to go
+2026-06-01 14:23:50 [INFO] [SelfPlay] Priority: 50% snapshot category, 50% bot category (Wanderer/Pazzo/Random/Static)

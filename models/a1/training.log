@@ -118,3 +118,7 @@
 2026-05-30 08:22:00 [INFO]   snapshot_3000000: 50.6% (842/1663)
 2026-05-30 08:22:00 [INFO]   snapshot_6000000: No matches yet
 2026-05-30 08:22:00 [INFO] ----------------------------------
+2026-06-01 10:28:33 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\models\a1\training.log
+2026-06-01 10:28:33 [INFO] [SelfPlay] Loading pretrained A0 weights from models/a0.1_checkpoints/a0.1_snapshot_5000000.zip
+2026-06-01 10:28:35 [INFO] [SelfPlay] Starting — 8 envs, 30,000,000 steps to go
+2026-06-01 10:28:35 [INFO] [SelfPlay] Priority: 50% snapshot category, 50% bot category (Wanderer/Pazzo/Random/Static)
