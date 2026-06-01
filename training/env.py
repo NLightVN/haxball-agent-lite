@@ -442,18 +442,34 @@ class HaxballCurriculumEnv(gym.Env):
                     
                 else:
                     self.ball = Disc(0.0, 0.0, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
-                    # Add slight noise to prevent deterministic kickoff physics tie-breakers
-                    nx1 = float(self._rng.uniform(-10.0, 10.0))
-                    ny1 = float(self._rng.uniform(-10.0, 10.0))
-                    nx2 = float(self._rng.uniform(-10.0, 10.0))
-                    ny2 = float(self._rng.uniform(-10.0, 10.0))
-                    # Red on left, Blue on right
-                    if self.team_id == 1:
-                        self.agents.append(Disc(-self.HW * 0.5 + nx1, ny1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Agent (RED)
-                        self.agents.append(Disc( self.HW * 0.5 + nx2, ny2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Opp (BLUE)
+                    
+                    # y random trong -goal_y, goal_y
+                    y1 = float(self._rng.uniform(-self.goal_y, self.goal_y))
+                    y2 = float(self._rng.uniform(-self.goal_y, self.goal_y))
+                    
+                    # Khoảng cách tới bóng của người gần hơn
+                    dist_near = float(self._rng.uniform(PLYR_R + BALL_R + 5.0, self.HW * 0.5))
+                    # Khoảng cách tới bóng của người xa hơn (hơn người kia từ 60 đến 90)
+                    dist_far = dist_near + float(self._rng.uniform(60.0, 90.0))
+                    
+                    # Random xem RED hay BLUE ở gần bóng hơn
+                    if self._rng.random() < 0.5:
+                        d_red = dist_near
+                        d_blue = dist_far
                     else:
-                        self.agents.append(Disc( self.HW * 0.5 + nx1, ny1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Agent (BLUE)
-                        self.agents.append(Disc(-self.HW * 0.5 + nx2, ny2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Opp (RED)
+                        d_red = dist_far
+                        d_blue = dist_near
+                        
+                    # Red ở bên trái (âm), Blue ở bên phải (dương)
+                    red_x = -d_red
+                    blue_x = d_blue
+                    
+                    if self.team_id == 1:
+                        self.agents.append(Disc(red_x, y1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Agent (RED)
+                        self.agents.append(Disc(blue_x, y2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Opp (BLUE)
+                    else:
+                        self.agents.append(Disc(blue_x, y2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Agent (BLUE)
+                        self.agents.append(Disc(red_x, y1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Opp (RED)
 
     def _safe_spawn(self, max_tries: int = 80, x_min: float = None, x_max: float = None):
         """Return (x, y) not overlapping ball or already-placed agents.

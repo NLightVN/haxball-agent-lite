@@ -23,8 +23,8 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH      = "models/a1_checkpoints/snapshot_1000000.zip"  # Agent chính
-OPPONENT_MODEL_PATH = "models/a1_checkpoints/snapshot_3000000.zip" # Opponent model (dùng khi OPPONENT='Trained')
+A1_MODEL_PATH      = "models/a1_checkpoints/snapshot_10000000.zip"  # Agent chính
+OPPONENT_MODEL_PATH = "models/a1_checkpoints/snapshot_1000000.zip" # Opponent model (dùng khi OPPONENT='Trained')
 A0_MODEL_PATH = None
 OPPONENT = "Trained"                    # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
 GOAL_SIZE = 64.0                        # Goal half-height in physics units
