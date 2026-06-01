@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link href="style.css" rel="stylesheet" type="text/css">
+    <title>Haxball Agent Lite</title>
+</head>
+
+<body>
+    <div class="bar-container">
+        <div class="bar">
+            <div class="scoreboard">
+                <div class="teamicon red"></div>
+                <div class="score" data-hook="red-score">0</div>
+                <div>-</div>
+                <div class="score" data-hook="blue-score">0</div>
+                <div class="teamicon blue"></div>
+            </div>
+            <div class="game-timer-view">
+                <span class="overtime">OVERTIME!</span>
+                <span class="digit">0</span>
+                <span class="digit">0</span>
+                <span class="null">:</span>
+                <span class="digit">0</span>
+                <span class="digit">0</span>
+            </div>
+        </div>
+    </div>
+    <canvas id="canvas_div"></canvas>
+
+    <!-- Auto-load futsal map into localStorage before game init -->
+    <script>
+        (function () {
+            var DEFAULT_MAP = 'maps/futsal.hbs';
+            var existing = localStorage.getItem('customStadium');
+            var alreadyFutsal = false;
+            if (existing) {
+                try {
+                    var s = JSON.parse(existing);
+                    // Consider it already loaded if name contains 'utsal' (covers different futsal map names)
+                    if (s.name && s.name.toLowerCase().indexOf('futsal') !== -1) alreadyFutsal = true;
+                } catch (e) { }
+            }
+            if (!alreadyFutsal) {
+                console.log('[auto-map] Fetching futsal map...');
+                fetch(DEFAULT_MAP)
+                    .then(function (r) { return r.json(); })
+                    .then(function (mapData) {
+                        // Apply trait fixes (same as validateAndApplyMap)
+                        if (!mapData.traits || Array.isArray(mapData.traits)) mapData.traits = {};
+                        if (!mapData.traits.ballArea) mapData.traits.ballArea = { vis: true, bCoef: 1, cMask: ['ball'] };
+                        if (!mapData.traits.goalNet && mapData.segments && mapData.segments.some(function (s) { return s.trait === 'goalNet'; }))
+                            mapData.traits.goalNet = { vis: true, bCoef: 0.1, cMask: ['ball'] };
+                        localStorage.setItem('customStadium', JSON.stringify(mapData));
+                        console.log('[auto-map] Futsal map saved, reloading...');
+                        location.reload();
+                    })
+                    .catch(function (e) { console.warn('[auto-map] Could not fetch futsal.hbs:', e); });
+            } else {
+                console.log('[auto-map] Futsal map already in localStorage, skipping fetch.');
+            }
+        })();
+    </script>
+
+    <!-- Load scripts in order -->
+    <script>
+        console.log('=== LOADING GAME ===');
+        console.log('1. HTML loaded');
+    </script>
+    <script src="msgpack.min.js" onload="console.log('2. msgpack loaded')"
+        onerror="console.error('ERROR: msgpack failed')"></script>
+    <script src="bot.js" onload="console.log('3. bot.js loaded')"
+        onerror="console.error('ERROR: bot.js failed')"></script>
+    <script src="script.js" onload="console.log('4. script.js loaded - GAME SHOULD START')"
+        onerror="console.error('ERROR: script.js failed')"></script>
+    <script src="agent-api.js" onload="console.log('5. agent-api loaded')"
+        onerror="console.error('ERROR: agent-api failed')"></script>
+    <script src="enhanced-bot.js" onload="console.log('6. enhanced-bot loaded')"
+        onerror="console.error('ERROR: enhanced-bot failed')"></script>
+
+    <!-- PPO Bot: onnxruntime-web + model inference -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"
+        onload="console.log('7. onnxruntime-web loaded')"
+        onerror="console.error('ERROR: onnxruntime-web CDN failed')"></script>
+    <script src="ppo_bot.js" onload="console.log('8. ppo_bot.js loaded')"
+        onerror="console.error('ERROR: ppo_bot.js failed')"></script>
+
+    <script>
+        console.log('=== ALL SCRIPTS LOADED ===');
+        setTimeout(() => {
+            console.log('Canvas:', document.getElementById('canvas_div'));
+            console.log('Players:', typeof playersArray !== 'undefined' ? playersArray.length : 'UNDEFINED');
+            console.log('PPOBot ready:', typeof PPOBot !== "undefined" ? PPOBot.loaded : "NOT LOADED");
+            console.log('💡 Add AI bot: AgentAPI.addBot("A1", 1, ppoBot)');
+        }, 2000);
+    </script>
+</body>
+
+</html>

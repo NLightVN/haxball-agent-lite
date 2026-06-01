@@ -1,0 +1,129 @@
+2026-05-29 16:00:02 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\models\a0.1\training.log
+2026-05-29 16:00:02 [INFO] [A0.1] Starting completely fresh
+2026-05-29 16:00:03 [INFO] [A0.1] Starting — 8 envs, 6,000,000 steps to go
+2026-05-29 16:01:11 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_250000.zip
+2026-05-29 16:02:17 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_500000.zip
+2026-05-29 16:04:46 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_750000.zip
+2026-05-29 16:06:53 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1000000.zip
+2026-05-29 16:10:57 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1250000.zip
+2026-05-29 16:12:36 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1500000.zip
+2026-05-29 16:16:26 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1750000.zip
+2026-05-29 16:20:39 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2000000.zip
+2026-05-29 16:24:36 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2250000.zip
+2026-05-29 16:28:31 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2500000.zip
+2026-05-29 16:31:08 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2750000.zip
+2026-05-29 16:44:58 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\models\a0.1\training.log
+2026-05-29 16:44:58 [INFO] [A0.1] Starting completely fresh
+2026-05-29 16:44:59 [INFO] [A0.1] Starting — 8 envs, 6,000,000 steps to go
+2026-05-29 16:48:40 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_250000.zip
+2026-05-29 16:52:19 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_500000.zip
+2026-05-29 16:53:26 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_750000.zip
+2026-05-29 16:54:31 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1000000.zip
+2026-05-29 16:55:37 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1250000.zip
+2026-05-29 16:56:43 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1500000.zip
+2026-05-29 16:57:48 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1750000.zip
+2026-05-29 16:58:52 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2000000.zip
+2026-05-29 16:59:57 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2250000.zip
+2026-05-29 17:01:02 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2500000.zip
+2026-05-29 17:02:07 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2750000.zip
+2026-05-29 17:03:12 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3000000.zip
+2026-05-29 17:04:17 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3250000.zip
+2026-05-29 17:05:22 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3500000.zip
+2026-05-29 17:06:26 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3750000.zip
+2026-05-29 17:07:31 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_4000000.zip
+2026-05-29 17:08:36 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_4250000.zip
+2026-05-29 17:09:40 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_4500000.zip
+2026-05-29 17:11:49 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_4750000.zip
+2026-05-29 17:12:54 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_5000000.zip
+2026-05-29 17:22:10 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\models\a0.1\training.log
+2026-05-29 17:22:10 [INFO] [A0.1] Starting completely fresh
+2026-05-29 17:22:12 [INFO] [A0.1] Starting — 8 envs, 6,000,000 steps to go
+2026-05-29 17:23:19 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_250000.zip
+2026-05-29 17:24:27 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_500000.zip
+2026-05-29 17:25:35 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_750000.zip
+2026-05-29 17:27:57 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1000000.zip
+2026-05-29 17:31:05 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1250000.zip
+2026-05-29 17:34:13 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1500000.zip
+2026-05-29 17:35:21 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1750000.zip
+2026-05-29 17:36:30 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2000000.zip
+2026-05-29 17:37:39 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2250000.zip
+2026-05-29 17:38:48 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2500000.zip
+2026-05-29 17:39:47 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\models\a0.1\training.log
+2026-05-29 17:39:47 [INFO] [A0.1] Starting completely fresh
+2026-05-29 17:39:48 [INFO] [A0.1] Starting — 8 envs, 6,000,000 steps to go
+2026-05-29 17:41:12 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_250000.zip
+2026-05-29 17:42:28 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_500000.zip
+2026-05-29 17:43:37 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_750000.zip
+2026-05-29 17:44:47 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1000000.zip
+2026-05-29 17:45:56 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1250000.zip
+2026-05-29 17:47:04 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1500000.zip
+2026-05-29 17:48:13 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1750000.zip
+2026-05-29 17:49:21 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2000000.zip
+2026-05-29 17:50:30 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2250000.zip
+2026-05-29 17:51:38 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2500000.zip
+2026-05-29 17:52:46 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2750000.zip
+2026-05-29 17:54:34 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3000000.zip
+2026-05-29 17:56:33 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3250000.zip
+2026-05-29 17:57:43 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3500000.zip
+2026-05-29 17:58:52 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3750000.zip
+2026-05-29 18:00:01 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_4000000.zip
+2026-05-29 18:01:10 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_4250000.zip
+2026-05-29 18:02:18 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_4500000.zip
+2026-05-29 18:03:36 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_4750000.zip
+2026-05-29 18:04:44 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_5000000.zip
+2026-05-29 18:07:51 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_5250000.zip
+2026-05-29 18:10:19 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_5500000.zip
+2026-05-29 21:48:08 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\models\a0.1\training.log
+2026-05-29 21:48:08 [INFO] [A0.1] Starting completely fresh
+2026-05-29 21:48:11 [INFO] [A0.1] Starting — 8 envs, 6,000,000 steps to go
+2026-05-29 21:52:06 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_250000.zip
+2026-05-29 21:53:57 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_500000.zip
+2026-05-29 21:55:45 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_750000.zip
+2026-05-29 21:56:48 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1000000.zip
+2026-05-29 21:57:53 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1250000.zip
+2026-05-29 21:59:03 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1500000.zip
+2026-05-29 22:00:07 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1750000.zip
+2026-05-29 22:01:10 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2000000.zip
+2026-05-29 22:02:13 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2250000.zip
+2026-05-29 22:03:16 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2500000.zip
+2026-05-29 22:04:26 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2750000.zip
+2026-05-29 22:47:48 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3000000.zip
+2026-05-29 22:49:07 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3250000.zip
+2026-05-29 22:56:27 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\models\a0.1\training.log
+2026-05-29 22:56:27 [INFO] [A0.1] Starting completely fresh
+2026-05-29 22:56:28 [INFO] [A0.1] Starting — 8 envs, 6,000,000 steps to go
+2026-05-29 22:59:56 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_250000.zip
+2026-05-29 23:02:11 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_500000.zip
+2026-05-29 23:04:11 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_750000.zip
+2026-05-29 23:08:11 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1000000.zip
+2026-05-29 23:12:03 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1250000.zip
+2026-05-29 23:15:50 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1500000.zip
+2026-05-29 23:19:44 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_1750000.zip
+2026-05-29 23:23:45 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2000000.zip
+2026-05-29 23:27:39 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2250000.zip
+2026-05-29 23:31:27 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2500000.zip
+2026-05-29 23:35:14 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_2750000.zip
+2026-05-30 00:22:51 [INFO] Logger initialised — writing to E:\Tran Quang Hung\haxball-agent-lite\models\a0.1\training.log
+2026-05-30 00:22:51 [INFO] [A0.1] Resuming from models/a0_checkpoints/a0_snapshot_3000000.zip
+2026-05-30 00:23:18 [INFO] Logger initialised — writing to E:\Tran Quang Hung\haxball-agent-lite\models\a0.1\training.log
+2026-05-30 00:23:18 [INFO] [A0.1] Resuming from models/a0_checkpoints/a0_3000000_steps.zip
+2026-05-30 00:24:08 [INFO] Logger initialised — writing to E:\Tran Quang Hung\haxball-agent-lite\models\a0.1\training.log
+2026-05-30 00:24:08 [INFO] [A0.1] Resuming from models/a0_checkpoints/a0_3000000_steps.zip
+2026-05-30 00:24:09 [INFO] [A0.1] Starting — 8 envs, 0 steps to go
+2026-05-30 00:24:09 [INFO] [A0.1] Done -> models/a0.1_final.zip
+2026-05-30 00:34:01 [INFO] Logger initialised — writing to E:\Tran Quang Hung\haxball-agent-lite\models\a0.1\training.log
+2026-05-30 00:34:01 [INFO] [A0.1] Resuming from models/a0_checkpoints/a0_3000000_steps.zip
+2026-05-30 00:34:02 [INFO] [A0.1] Starting — 8 envs, 2,000,000 steps to go
+2026-05-30 00:34:56 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3250000.zip
+2026-05-30 00:37:49 [INFO] Logger initialised — writing to E:\Tran Quang Hung\haxball-agent-lite\models\a0.1\training.log
+2026-05-30 00:37:49 [INFO] [A0.1] Resuming from models/a0_checkpoints/a0_3000000_steps.zip
+2026-05-30 00:37:51 [INFO] [A0.1] Starting — 8 envs, 2,000,000 steps to go
+2026-05-30 00:39:34 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3250000.zip
+2026-05-30 00:43:07 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3500000.zip
+2026-05-30 00:46:23 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_3750000.zip
+2026-05-30 00:50:01 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_4000000.zip
+2026-05-30 00:53:37 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_4250000.zip
+2026-05-30 00:57:09 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_4500000.zip
+2026-05-30 01:00:40 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_4750000.zip
+2026-05-30 01:04:11 [INFO] [A0.1] Saved snapshot to models/a0.1_checkpoints\a0.1_snapshot_5000000.zip
+2026-05-30 01:04:26 [INFO] [A0.1] Done -> models/a0.1_final.zip

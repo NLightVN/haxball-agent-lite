@@ -116,21 +116,21 @@ window.AgentAPI = {
     getBoundingBox: getBoundingBox,
 
     // ─────────────────────────────────────────────────────────────────────────
-    // getObs(agentTeam) → flat Float32Array, shape (101,)
+    // getObs(agentTeam) → flat Float32Array, shape (106,)
     //
     // Section 1 — Field constants  [0..3]   4 features
     //   goal_y/NORM, HH/NORM, HW/NORM, agentTeam(0=RED,1=BLUE)
     // Section 2 — Agent ↔ Ball     [4..7]   4 features
     //   d_to_ball_x, d_to_ball_y, dist_to_ball, can_kick
-    // Section 3 — Dynamic state    [8..16]  9 features
-    //   ball_x, ball_y, ball_xs, ball_ys,
-    //   my_x, my_y, my_xs, my_ys, my_speed
-    // Section 4 — Game state       [17..18] 2 features
+    // Section 2b — Ball ↔ Goals    [8..11]  4 features
+    //   opp_goal_dx, opp_post_dy, own_goal_dx, own_post_dy
+    // Section 3 — Dynamic state    [12..22] 11 features
+    //   ball_x, ball_y (rel), ball_xs, ball_ys,
+    //   my_x, my_y (rel), my_xs, my_ys, my_speed, rel_xs, rel_ys
+    // Section 4 — Game state       [23..24] 2 features
     //   time_remaining, possession
-    // Section 5 — Teammates ×4    [19..54]  9×4=36 features  (pad 0 if absent)
-    // Section 6 — Opponents  ×5   [55..99]  9×5=45 features  (pad 0 if absent)
-    // Section 7 — Intercept       [100]     1 feature
-    //   intercept_who: +1=agent, +0.5=teammate, -1=opponent, 0=none/unknown
+    // Section 5 — Teammates ×4     [25..60] 9×4=36 features  (pad 0 if absent)
+    // Section 6 — Opponents  ×5    [61..105] 9×5=45 features  (pad 0 if absent)
     //
     // Per player (teammate/opp), 9 features:
     //   x/NORM, y/NORM, xs/MS, ys/MS,
@@ -159,9 +159,11 @@ window.AgentAPI = {
         const HH = (bbox.H || NORM) / 2;
 
         let goal_y = 85; // default valn-v4
+        let goal_center_y = 0;
         if (stadium.goals && stadium.goals.length > 0) {
             const g = stadium.goals[0];
             goal_y = Math.abs(g.p0[1] - g.p1[1]) / 2;
+            goal_center_y = (g.p0[1] + g.p1[1]) / 2;
         }
 
         // ── Ball ──
@@ -234,16 +236,29 @@ window.AgentAPI = {
         obs.push(db_me / DIAG);                      // dist_to_ball
         obs.push(Math.hypot(bx - mx, by - my) <= KICK_DIST ? 1 : 0); // can_kick
 
-        // Section 3 — Dynamic state (9)
+        // Section 2b — Ball ↔ Goals (4)
+        const top_post_y = goal_center_y - goal_y;
+        const bot_post_y = goal_center_y + goal_y;
+        const opp_post_y = Math.abs(top_post_y - by) < Math.abs(bot_post_y - by) ? top_post_y : bot_post_y;
+        const own_post_y = opp_post_y; // assuming symmetric goals
+
+        obs.push((HW - flip * bx) / NORM);           // dx to opp goal line
+        obs.push((opp_post_y - by) / NORM);          // dy to nearest opp post
+        obs.push((-HW - flip * bx) / NORM);          // dx to own goal line
+        obs.push((own_post_y - by) / NORM);          // dy to nearest own post
+
+        // Section 3 — Dynamic state (11)
         obs.push(flip * bx / NORM);
-        obs.push(by / NORM);
+        obs.push((by - goal_center_y) / NORM);
         obs.push(flip * bxs / MAX_SPEED);
         obs.push(bys / MAX_SPEED);
         obs.push(flip * mx / NORM);
-        obs.push(my / NORM);
+        obs.push((my - goal_center_y) / NORM);
         obs.push(flip * mxs / MAX_SPEED);
         obs.push(mys / MAX_SPEED);
         obs.push(Math.hypot(mxs, mys) / MAX_SPEED);  // my_speed
+        obs.push(flip * (mxs - bxs) / MAX_SPEED);    // rel vel x
+        obs.push((mys - bys) / MAX_SPEED);           // rel vel y
 
         // Section 4 — Game state (2)
         // time_remaining: game object may expose timeLimit/time
@@ -281,7 +296,7 @@ window.AgentAPI = {
             }
         }
 
-        // obs.length should be 4+4+9+2+36+45 = 100
+        // obs.length should be 4+4+4+11+2+36+45 = 106
 
         return obs;
     },
