@@ -1,124 +1,81 @@
 # Haxball Agent Lite ⚽🤖
 
-
-
-## 🚀 Quick Start
-
-open play.py
+Một dự án huấn luyện AI (Reinforcement Learning) chơi Haxball sử dụng Python, **Stable Baselines3 (PPO)** và **Pygame**.
+Dự án bao gồm một môi trường vật lý (physics environment) giả lập chính xác gameplay của Haxball, cùng với các kịch bản huấn luyện nâng cao như Self-Play (PFSP) và Curriculum Learning.
 
 ---
 
-## 🎮 Controls
+## 🚀 Hướng Dẫn Bắt Đầu (Quick Start)
 
-| Player | Team | Controls |
-|--------|------|----------|
-| **Player 1** | 🔴 Red | **WASD** + **Space** |
-| **Player 2** | 🔵 Blue | **Arrow Keys** + **X** |
-
----
-
-## 🤖 Agent API
-
-### Get Game State
-
-```javascript
-const state = AgentAPI.getState();
-// Returns: {ball, players, score, stadium, frame}
+### 1. Cài đặt yêu cầu (Requirements)
+Dự án yêu cầu Python 3.8+ và các thư viện sau:
+```bash
+pip install numpy pygame stable-baselines3 tensorboard
 ```
 
-### Control a Player
-
-```javascript
-AgentAPI.setPlayerInput(0, {
-    up: false,
-    down: false,
-    left: true,
-    right: false,
-    kick: true
-});
+### 2. Chơi với AI (Interactive Play)
+Bạn có thể tự mình thi đấu với mô hình AI đã được huấn luyện hoặc xem AI tự đá bằng cách chạy file `play.py`.
+```bash
+python play.py
 ```
 
-### Create a Bot
-
-```javascript
-const bot = new EnhancedBot(1); // Control Player 2
-setInterval(() => bot.update(), 1000/60); // Run at 60 FPS
-```
+**🎮 Điều khiển khi chơi (Human vs AI):**
+- **Cụm phím Mũi tên**: Di chuyển (Lên/Xuống/Trái/Phải)
+- **Enter / Ctrl Phải**: Sút bóng (Kick)
+- **Space**: Tạm dừng (Pause) / Tiếp tục (Resume)
+- **R**: Chơi lại ván mới ngay lập tức
+- **Q / ESC**: Thoát game
 
 ---
 
-## 📚 Full Documentation
-
-See [`README_FULL.md`](offline/README.md) for:
-- Complete API documentation
-- Advanced bot examples
-- Physics constants
-- Custom stadium creation
-
----
-
-## 📁 Project Structure
+## 📁 Cấu Trúc Dự Án (Project Structure)
 
 ```
 haxball-agent-lite/
-├── index.html          # Main game (LITE version)
-├── script.js           # Physics engine (86KB - authentic!)
-├── bot.js              # Original bot functions
-├── agent-api.js        # Agent API wrapper
-├── enhanced-bot.js     # Example AI bot
-├── style.css, audio/   # Assets
-│
-├── offline/            # Original offline version
-├── legacy/             # Old experimental versions
-└── README.md           # This file
+├── play.py               # Script chơi game tương tác (Human vs AI hoặc AI vs AI)
+├── eval.py               # Script đánh giá hiệu suất của mô hình
+├── eval_render.py        # Đánh giá mô hình có giao diện hiển thị
+├── training/             # Chứa mã nguồn môi trường và huấn luyện
+│   ├── env.py            # Môi trường giả lập vật lý Haxball (Gym Environment)
+│   ├── train_a0.py       # Script huấn luyện PPO cơ bản
+│   └── train_a1_pfsp.py  # Script huấn luyện nâng cao bằng Self-Play (PFSP)
+├── models/               # Thư mục chứa các model checkpoints đã lưu
+├── tensorboard/          # Chứa log huấn luyện cho Tensorboard
+└── js_env/               # Bản gốc hoặc giao diện web LITE (HTML/JS)
 ```
 
 ---
 
-## ✨ Features
+## 🤖 Huấn Luyện AI (Training)
 
-✅ **100% Offline** - No internet required  
-✅ **Authentic Physics** - Same as original Haxball  
-✅ **Full Agent API** - Complete game state access  
-✅ **Easy Bot Development** - Simple JavaScript interface  
-✅ **Classic Map** - Official Haxball stadium  
-✅ **Clean UI** - Just score and timer  
+Môi trường AI được thiết kế theo quy chuẩn Gym Env, hỗ trợ **Curriculum Learning** và **Prioritized Fictitious Self-Play (PFSP)**.
 
----
+### Huấn luyện Cơ bản (Phase A0)
+```bash
+python training/train_a0.py
+```
+Dùng để huấn luyện agent những kỹ năng cơ bản ban đầu (vd: sút bóng vào lưới trống).
 
-## 🎯 Next Steps
+### Huấn luyện Self-Play (Phase A1)
+```bash
+python training/train_a1_pfsp.py
+```
+Sử dụng phương pháp **PFSP** để Agent tự đấu với chính các phiên bản cũ của mình (checkpoints) hoặc các bot cơ bản (Random, Wanderer...) nhằm nâng cao khả năng thi đấu đối kháng.
 
-1. **Play**: Open `index.html` and play with a friend
-2. **Bot**: F12 console → `new EnhancedBot(1)` to add AI
-3. **Customize**: Edit `script.js` to change physics or add features
-4. **Train AI**: Use Agent API to build ML-powered bots
-
----
-
-## 📖 Examples
-
-### Simple Chase Bot
-
-```javascript
-function chaseBot() {
-    const state = AgentAPI.getState();
-    const me = state.players[1]; // Player 2
-    const ball = state.ball;
-    
-    AgentAPI.setPlayerInput(1, {
-        left: ball.x < me.disc.x,
-        right: ball.x > me.disc.x,
-        up: ball.y < me.disc.y,
-        down: ball.y > me.disc.y,
-        kick: AgentAPI.distance(me.disc, ball) < 30
-    });
-}
-
-setInterval(chaseBot, 1000/60);
+**Theo dõi quá trình huấn luyện bằng TensorBoard:**
+```bash
+tensorboard --logdir tensorboard/
 ```
 
 ---
 
-**Ready to build AI agents!** 🤖⚽
+## ✨ Tính Năng Nổi Bật (Features)
+✅ **Môi trường vật lý (Physics Env) hoàn chỉnh bằng Python**: Chạy cực nhanh, không cần server hay browser.  
+✅ **Thuật toán PPO tối ưu**: Tích hợp sẵn Stable-Baselines3.  
+✅ **Curriculum Learning**: Tự động tăng độ khó mục tiêu, giúp AI học nhanh và hiệu quả hơn.  
+✅ **Self-Play (PFSP)**: Quản lý đối thủ thông minh, giúp Agent học hỏi từ điểm yếu của đối thủ cũ mà không bị "bỏ quên" (forgetting).  
+✅ **Giao diện Pygame mượt mà**: Debug trực quan, tốc độ 60 FPS chuẩn Haxball.
 
-Made with ❤️ for offline Haxball AI development
+---
+
+> 💡 **Tip:** Nếu bạn muốn tinh chỉnh cấu hình của trận đấu (Agent nào đấu với Agent nào, thay đổi thành Human vs AI, v.v.), hãy chỉnh sửa các hằng số ở phần `Configuration` trong file `play.py`.
