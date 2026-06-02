@@ -23,17 +23,17 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH      = "models/a1_final.zip"  # Agent chính
-OPPONENT_MODEL_PATH = "models/a1_checkpoints/snapshot_1000000.zip" # Opponent model (dùng khi OPPONENT='Trained')
+A1_MODEL_PATH         = "models/a2_checkpoints/snapshot_3000000.zip"  # Agent chính (và Đồng đội)
+OPPONENT_MODEL_PATH_1 = "models/a1_checkpoints/snapshot_28000000.zip" # Đối thủ 1
 A0_MODEL_PATH = None
-OPPONENT = "Human"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
-GOAL_SIZE = 64.0                        # Goal half-height in physics units
+OPPONENT = "Trained"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
+GOAL_SIZE = 85.0                        # Goal half-height in physics units
 DETERMINISTIC = True                    # Use deterministic policy actions
 
 # Display labels (auto-derived from model paths)
 _stem = lambda p: os.path.splitext(os.path.basename(p))[0] if p else None
-AGENT_LABEL = _stem(A1_MODEL_PATH)   or "A1"
-OPP_LABEL   = _stem(OPPONENT_MODEL_PATH) or "OPP"
+AGENT_LABEL  = _stem(A1_MODEL_PATH)   or "A1"
+OPP_LABEL_1  = _stem(OPPONENT_MODEL_PATH_1) or "OPP1"
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
@@ -157,13 +157,22 @@ def draw_players(screen, env, surf_rect):
         sx, sy = field_to_screen(ag.x, ag.y, env, surf_rect)
         r = max(px_scale(ag.radius, env, surf_rect), 6)
 
+        is_teammate = env.agents_team[i] == env.team_id if hasattr(env, 'agents_team') and len(env.agents_team) > i else (i == 0)
+        team_of_agent = env.agents_team[i] if hasattr(env, 'agents_team') and len(env.agents_team) > i else (env.team_id if i == 0 else 3 - env.team_id)
+        
+        color = C_AGENT if team_of_agent == 1 else C_OPP
+        
         if i == 0:
-            # Agent: determine colour by team
-            color = C_AGENT if env.team_id == 1 else C_OPP
             label = AGENT_LABEL
+        elif is_teammate:
+            label = "TM"
         else:
-            color = C_OPP if env.team_id == 1 else C_AGENT
-            label = OPP_LABEL if env.opponent_type == 'Trained' else (env.opponent_type[:3] if env.opponent_type else "BOT")
+            if i == 2:
+                label = OPP_LABEL_1 if env.opponent_type == 'Trained' else "BOT"
+            elif i == 3:
+                label = OPP_LABEL_2 if env.opponent_type == 'Trained' else "BOT"
+            else:
+                label = "OPP"
 
         # Shadow
         shadow_surf = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
@@ -278,6 +287,9 @@ def draw_panel(screen, env, step, ep_reward, step_reward, episode, total_eps,
 def main():
     print(f"Loading model: {A1_MODEL_PATH}")
     a1_model = PPO.load(A1_MODEL_PATH, device="cpu")
+    
+    print(f"Loading opponent model 1: {OPPONENT_MODEL_PATH_1}")
+    opp_model_1 = PPO.load(OPPONENT_MODEL_PATH_1, device="cpu")
 
     pygame.init()
     screen = pygame.display.set_mode((WIN_W, WIN_H))
@@ -288,7 +300,10 @@ def main():
     # Field surface rect (below panel, with 5px margin)
     field_rect = pygame.Rect(5, PANEL_H + 5, WIN_W - 10, FIELD_H)
 
-    env = HaxballCurriculumEnv(phase="A1")
+    env = HaxballCurriculumEnv(phase="A2")
+    env.current_model = a1_model
+    env.opponent_policies = [opp_model_1]
+    
     if A0_MODEL_PATH:
         env.a0_model_path = A0_MODEL_PATH
 
@@ -301,9 +316,7 @@ def main():
             env.forced_opponent_type = OPPONENT
 
     # ── Load opponent policy if Trained ──────────────────────────────────────
-    if OPPONENT.lower() == "trained" and OPPONENT_MODEL_PATH:
-        print(f"Loading opponent model: {OPPONENT_MODEL_PATH}")
-        env.opponent_policy = PPO.load(OPPONENT_MODEL_PATH, device="cpu")
+    # Opponents are already loaded and set in env.opponent_policies
 
     is_human_opp = OPPONENT and OPPONENT.lower() == "human"
 
