@@ -23,8 +23,10 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH         = "models/a2_checkpoints/snapshot_3000000.zip"  # Agent chính (và Đồng đội)
-OPPONENT_MODEL_PATH_1 = "models/a1_checkpoints/snapshot_28000000.zip" # Đối thủ 1
+A1_MODEL_PATH         = "models/a1.1_checkpoints/a1.1_snapshot_1000000.zip"  # Agent chính (và Đồng đội)
+OPPONENT_MODEL_PATH_1 = "models/a1.1_checkpoints/a1.1_snapshot_1000000.zip" # Đối thủ 1
+OPPONENT_MODEL_PATH_2 = "models/a1_checkpoints/snapshot_28000000.zip" # Đối thủ 2
+OPPONENT_MODEL_PATH_3 = "models/a1_checkpoints/snapshot_28000000.zip" # Đối thủ 3
 A0_MODEL_PATH = None
 OPPONENT = "Trained"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
 GOAL_SIZE = 85.0                        # Goal half-height in physics units
@@ -34,6 +36,8 @@ DETERMINISTIC = True                    # Use deterministic policy actions
 _stem = lambda p: os.path.splitext(os.path.basename(p))[0] if p else None
 AGENT_LABEL  = _stem(A1_MODEL_PATH)   or "A1"
 OPP_LABEL_1  = _stem(OPPONENT_MODEL_PATH_1) or "OPP1"
+OPP_LABEL_2  = _stem(OPPONENT_MODEL_PATH_2) or "OPP2"
+OPP_LABEL_3  = _stem(OPPONENT_MODEL_PATH_3) or "OPP3"
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
@@ -167,10 +171,13 @@ def draw_players(screen, env, surf_rect):
         elif is_teammate:
             label = "TM"
         else:
-            if i == 2:
+            opp_idx = i - env.agents_team.count(env.team_id)
+            if opp_idx == 0:
                 label = OPP_LABEL_1 if env.opponent_type == 'Trained' else "BOT"
-            elif i == 3:
+            elif opp_idx == 1:
                 label = OPP_LABEL_2 if env.opponent_type == 'Trained' else "BOT"
+            elif opp_idx == 2:
+                label = OPP_LABEL_3 if env.opponent_type == 'Trained' else "BOT"
             else:
                 label = "OPP"
 
@@ -291,18 +298,24 @@ def main():
     print(f"Loading opponent model 1: {OPPONENT_MODEL_PATH_1}")
     opp_model_1 = PPO.load(OPPONENT_MODEL_PATH_1, device="cpu")
 
+    print(f"Loading opponent model 2: {OPPONENT_MODEL_PATH_2}")
+    opp_model_2 = PPO.load(OPPONENT_MODEL_PATH_2, device="cpu")
+
+    print(f"Loading opponent model 3: {OPPONENT_MODEL_PATH_3}")
+    opp_model_3 = PPO.load(OPPONENT_MODEL_PATH_3, device="cpu")
+
     pygame.init()
     screen = pygame.display.set_mode((WIN_W, WIN_H))
-    pygame.display.set_caption("Haxball — A0.1 Play")
+    pygame.display.set_caption("Haxball — A3 Play")
     clock = pygame.time.Clock()
     init_fonts()
 
     # Field surface rect (below panel, with 5px margin)
     field_rect = pygame.Rect(5, PANEL_H + 5, WIN_W - 10, FIELD_H)
 
-    env = HaxballCurriculumEnv(phase="A2")
+    env = HaxballCurriculumEnv(phase="A3")
     env.current_model = a1_model
-    env.opponent_policies = [opp_model_1]
+    env.opponent_policies = [opp_model_1, opp_model_2, opp_model_3]
     
     if A0_MODEL_PATH:
         env.a0_model_path = A0_MODEL_PATH

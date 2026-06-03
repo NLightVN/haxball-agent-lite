@@ -184,8 +184,8 @@ class HaxballCurriculumEnv(gym.Env):
         self.HH = 270.0
         self.goal_y = 85.0
         
-        # Load custom map size and goal size for A2/A2V1
-        if self.phase in ('A2', 'A2V1'):
+        # Load custom map size and goal size for A2/A3/A2V1
+        if self.phase in ('A2', 'A3', 'A2V1'):
             import os, json
             map_path = os.path.join(os.path.dirname(__file__), "..", "map_2v2.json")
             if os.path.exists(map_path):
@@ -490,10 +490,34 @@ class HaxballCurriculumEnv(gym.Env):
                         self.agents.append(Disc(red_x, red_y, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Opp (RED)
                     self.agents_team = [self.team_id, 3 - self.team_id]
 
-                elif self.phase == 'A2':
+                elif self.phase in ('A2', 'A3'):
                     self.is_1v1 = False
-                    if self.p_1v1 > 0 and self._rng.random() < self.p_1v1:
-                        self.is_1v1 = True
+                    self.is_1v1_map = False
+                    self.is_3v3_chaos = False
+                    
+                    if self.phase == 'A3':
+                        r = self._rng.random()
+                        opp_pool = getattr(self, 'opponent_pool', None)
+                        has_3v3 = opp_pool is not None and len(getattr(opp_pool, 'pool_3v3', [])) > 0
+                        
+                        if r < 0.10:
+                            self.is_1v1 = True
+                            self.is_1v1_map = True
+                        elif r < 0.15:
+                            self.is_1v1 = True
+                            self.is_1v1_map = False
+                        else:
+                            if not has_3v3:
+                                self.is_3v3_chaos = True
+                            elif r < 0.30:
+                                self.is_3v3_chaos = True
+                    else: # A2
+                        if self.p_1v1 > 0 and self._rng.random() < self.p_1v1:
+                            self.is_1v1 = True
+                            if self._rng.random() < 0.5:
+                                self.is_1v1_map = True
+                                
+                    if self.is_1v1:
                         self.ball = Disc(0.0, 0.0, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
                         y1 = float(self._rng.uniform(-self.goal_y, self.goal_y))
                         y2 = float(self._rng.uniform(-self.goal_y, self.goal_y))
@@ -515,7 +539,41 @@ class HaxballCurriculumEnv(gym.Env):
                             self.agents.append(Disc(blue_x, y2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
                             self.agents.append(Disc(red_x, y1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
                         self.agents_team = [self.team_id, 3 - self.team_id]
+                    elif self.phase == 'A3':
+                        # 3v3
+                        red_x1 = float(self._rng.uniform(-self.HW + PLYR_R, 0 - PLYR_R))
+                        red_y1 = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
+                        red_x2 = float(self._rng.uniform(-self.HW + PLYR_R, 0 - PLYR_R))
+                        red_y2 = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
+                        red_x3 = float(self._rng.uniform(-self.HW + PLYR_R, 0 - PLYR_R))
+                        red_y3 = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
+                        
+                        blue_x1 = float(self._rng.uniform(0 + PLYR_R, self.HW - PLYR_R))
+                        blue_y1 = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
+                        blue_x2 = float(self._rng.uniform(0 + PLYR_R, self.HW - PLYR_R))
+                        blue_y2 = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
+                        blue_x3 = float(self._rng.uniform(0 + PLYR_R, self.HW - PLYR_R))
+                        blue_y3 = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
+                        
+                        if self.team_id == 1:
+                            self.agents.append(Disc(red_x1, red_y1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                            self.agents.append(Disc(red_x2, red_y2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                            self.agents.append(Disc(red_x3, red_y3, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                            self.agents.append(Disc(blue_x1, blue_y1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                            self.agents.append(Disc(blue_x2, blue_y2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                            self.agents.append(Disc(blue_x3, blue_y3, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                        else:
+                            self.agents.append(Disc(blue_x1, blue_y1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                            self.agents.append(Disc(blue_x2, blue_y2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                            self.agents.append(Disc(blue_x3, blue_y3, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                            self.agents.append(Disc(red_x1, red_y1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                            self.agents.append(Disc(red_x2, red_y2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                            self.agents.append(Disc(red_x3, red_y3, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                        
+                        self.agents_team = [self.team_id, self.team_id, self.team_id, 3 - self.team_id, 3 - self.team_id, 3 - self.team_id]
+                        self.ball = Disc(0.0, 0.0, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
                     else:
+                        # 2v2 (A2)
                         red_x1 = float(self._rng.uniform(-self.HW + PLYR_R, 0 - PLYR_R))
                         red_y1 = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
                         red_x2 = float(self._rng.uniform(-self.HW + PLYR_R, 0 - PLYR_R))
@@ -525,17 +583,19 @@ class HaxballCurriculumEnv(gym.Env):
                         blue_y1 = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
                         blue_x2 = float(self._rng.uniform(0 + PLYR_R, self.HW - PLYR_R))
                         blue_y2 = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
-    
+                        
                         if self.team_id == 1:
                             self.agents.append(Disc(red_x1, red_y1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
                             self.agents.append(Disc(red_x2, red_y2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
                             self.agents.append(Disc(blue_x1, blue_y1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                            self.agents.append(Disc(blue_x2, blue_y2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
                         else:
                             self.agents.append(Disc(blue_x1, blue_y1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
                             self.agents.append(Disc(blue_x2, blue_y2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
                             self.agents.append(Disc(red_x1, red_y1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                            self.agents.append(Disc(red_x2, red_y2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
                         
-                        self.agents_team = [self.team_id, self.team_id, 3 - self.team_id]
+                        self.agents_team = [self.team_id, self.team_id, 3 - self.team_id, 3 - self.team_id]
                         self.ball = Disc(0.0, 0.0, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
 
                 else:
@@ -572,11 +632,17 @@ class HaxballCurriculumEnv(gym.Env):
             for a in self.agents:
                 a.y = float(np.clip(a.y, -self.HH + a.radius, self.HH - a.radius))
             
-        # Restore custom map sizes for A2 if they were overwritten by presets
-        if self.phase in ('A2', 'A2V1') and hasattr(self, '_a2_HW'):
-            self.HW = self._a2_HW
-            self.HH = self._a2_HH
-            self.goal_y = self._a2_goal_y
+        # Restore custom map sizes for A2/A3 if they were overwritten by presets
+        if self.phase in ('A2', 'A3', 'A2V1') and hasattr(self, '_a2_HW'):
+            if not getattr(self, 'is_1v1_map', False):
+                self.HW = self._a2_HW
+                self.HH = self._a2_HH
+                self.goal_y = self._a2_goal_y
+            else:
+                # Use 1v1 preset sizes
+                self.HW = float(preset[0])
+                self.HH = float(preset[1])
+                self.goal_y = float(preset[2])
 
     def _safe_spawn(self, max_tries: int = 80, x_min: float = None, x_max: float = None):
         """Return (x, y) not overlapping ball or already-placed agents.
@@ -619,8 +685,8 @@ class HaxballCurriculumEnv(gym.Env):
         
         agent_actions = [(dx * self._flip, dy, kick)]
         
-        # In A1/A1.2/A0.1/A2, we have an opponent. Determine their action.
-        if self.phase in ('A1', 'A1.2', 'A0.1', 'A2') and len(self.agents) > 1:
+        # In A1/A1.2/A0.1/A2/A3, we have an opponent. Determine their action.
+        if self.phase in ('A1', 'A1.2', 'A0.1', 'A2', 'A3') and len(self.agents) > 1:
             for idx_agent, other_ag in enumerate(self.agents[1:], start=1):
                 is_teammate = (self.agents_team[idx_agent] == self.team_id)
                 
@@ -661,7 +727,8 @@ class HaxballCurriculumEnv(gym.Env):
                             if getattr(self, 'is_1v1', False) and len(self.agents) == 2 and idx_agent == 1:
                                 opp_pol = self.opponent_policies[0]
                             else:
-                                pol_idx = idx_agent - 2
+                                num_teammates = self.agents_team.count(self.team_id)
+                                pol_idx = idx_agent - num_teammates
                                 if 0 <= pol_idx < len(self.opponent_policies):
                                     opp_pol = self.opponent_policies[pol_idx]
                         elif self.opponent_policy is not None:

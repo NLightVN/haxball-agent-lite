@@ -1,11 +1,11 @@
 """
-train_a2.py — 2v2 Self-Play Training with PFSP.
+train_a3.py — 3v3 Self-Play Training with PFSP.
 
 Cau truc:
   - 20% matches: 1v1 (agent vs 1 opponent tu pool).
-  - 80% matches: 2v2 (agent + clone hien tai) vs (1 opponent tu pool).
+  - 80% matches: 3v3 (agent + clone hien tai) vs (1 opponent tu pool).
 
-Pool duy nhat: opponent pool gom tat ca a1 + a1.1 + a2 snapshots.
+Pool duy nhat: opponent pool gom tat ca a1 + a1.1 + a3 snapshots.
 Dong doi = chinh agent dang duoc train (current_model).
 
 PFSP (Prioritized Fictitious Self-Play):
@@ -32,7 +32,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from training.env import HaxballCurriculumEnv
 from utils.model_logger import get_model_logger
 
-log = get_model_logger("a2")
+log = get_model_logger("a3")
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 N_ENVS            = 8
@@ -58,7 +58,7 @@ PPO_PARAMS = dict(
 )
 
 # ── Opponent Pool with PFSP ───────────────────────────────────────────────────
-class OpponentPool:
+class OpponentPoolA3:
     """
     Pool opponent voi PFSP sampling.
 
@@ -76,8 +76,9 @@ class OpponentPool:
       wr=1.0 -> w=0.05 (qua de,  it chon)
     """
     def __init__(self, min_games: int = PFSP_MIN_GAMES, floor: float = PFSP_FLOOR):
-        self.pool: list[str] = []         # danh sach duong dan model
+        self.pool: list[str] = []         # danh sach duong dan model (tat ca)
         self.pool_1v1: list[str] = []     # danh sach chi gom cac model 1v1
+        self.pool_3v3: list[str] = []     # danh sach chi gom cac model 3v3
         self._loaded: dict[str, PPO] = {} # cache: path -> policy
         self.stats: dict[str, dict] = {}  # path -> {'wins':int, 'total':int}
         self.min_games = min_games
@@ -89,8 +90,10 @@ class OpponentPool:
             self.pool.append(path)
             if is_1v1_model:
                 self.pool_1v1.append(path)
+            else:
+                self.pool_3v3.append(path)
             self.stats[path] = {'wins': 0, 'total': 0}  # wins = snapshot (opponent) wins
-            log.info(f"[Pool] + {os.path.basename(path)}  (total={len(self.pool)}, 1v1={len(self.pool_1v1)})")
+            log.info(f"[Pool] + {os.path.basename(path)}  (total={len(self.pool)}, 1v1={len(self.pool_1v1)}, 3v3={len(self.pool_3v3)})")
 
     def get_policy(self, path: str) -> PPO:
         if path not in self._loaded:
@@ -120,15 +123,28 @@ class OpponentPool:
         return max(4.0 * agent_wr * (1.0 - agent_wr), self.floor)
 
     # ── Sampling ──────────────────────────────────────────────────────────────
-    def sample(self, is_1v1: bool = False) -> tuple[PPO | None, str | None]:
-        """PFSP sampling: tra ve (policy, path). Neu is_1v1=True, chi sample tu pool_1v1."""
-        target_pool = self.pool_1v1 if is_1v1 else self.pool
+    def sample(self, is_1v1: bool = False, is_3v3_only: bool = False) -> tuple[PPO | None, str | None]:
+        """PFSP sampling: tra ve (policy, path). Neu is_3v3_only=True, sample tu pool_3v3."""
+        if is_1v1:
+            target_pool = self.pool_1v1
+        elif is_3v3_only:
+            target_pool = self.pool_3v3 if self.pool_3v3 else self.pool
+        else:
+            target_pool = self.pool
+            
         if not target_pool:
             return None, None
             
         weights = np.array([self._weight(p) for p in target_pool], dtype=np.float64)
         weights /= weights.sum()
         path = np.random.choice(target_pool, p=weights)
+        return self.get_policy(path), path
+
+    def sample_uniform(self) -> tuple[PPO | None, str | None]:
+        """Uniform sampling tu toan bo pool (bo qua PFSP)."""
+        if not self.pool:
+            return None, None
+        path = np.random.choice(self.pool)
         return self.get_policy(path), path
 
     # ── Stats summary ─────────────────────────────────────────────────────────
@@ -161,16 +177,16 @@ class OpponentPool:
 
 
 # ── Self-Play Environment ─────────────────────────────────────────────────────
-class SelfPlayEnvA2(HaxballCurriculumEnv):
+class SelfPlayEnvA3(HaxballCurriculumEnv):
     """
-    - phase='A2': dung map_2v2.json.
+    - phase='A3': dung map_3v3.json.
     - p_1v1: xac suat 1v1 (mac dinh 0.2).
     - Dong doi: current_model (agent dang train).
-    - Doi thu: PFSP sampling tu OpponentPool.
+    - Doi thu: PFSP sampling tu OpponentPoolA3.
     - Track ket qua tung tran de cap nhat winrate.
     """
-    def __init__(self, opponent_pool: OpponentPool, p_1v1: float = 0.2, **kwargs):
-        super().__init__(phase='A2', p_1v1=p_1v1, **kwargs)
+    def __init__(self, opponent_pool: OpponentPoolA3, p_1v1: float = 0.2, **kwargs):
+        super().__init__(phase='A3', p_1v1=p_1v1, **kwargs)
         self.opponent_pool = opponent_pool
         self._current_opp_paths: list[str] = []   # luu paths de bao cao ket qua
 
@@ -184,14 +200,20 @@ class SelfPlayEnvA2(HaxballCurriculumEnv):
             if getattr(self, 'is_1v1', False):
                 # Tran 1v1: chi chon doi thu 1v1
                 policy, path = self.opponent_pool.sample(is_1v1=True)
-                self._current_opp_paths = [path] if path else []
+                self._current_opp_paths = []  # winrate chi tinh trong 3v3 dong nhat
                 self.opponent_policies = [policy] if policy else []
+            elif getattr(self, 'is_3v3_chaos', False):
+                # Tran 3v3 chaos: boc 3 doi thu ngau nhien tu toan bo pool
+                pol1, path1 = self.opponent_pool.sample_uniform()
+                pol2, path2 = self.opponent_pool.sample_uniform()
+                pol3, path3 = self.opponent_pool.sample_uniform()
+                self._current_opp_paths = []  # winrate chi tinh trong 3v3 dong nhat
+                self.opponent_policies = [p for p in (pol1, pol2, pol3) if p]
             else:
-                # 2 doi thu doc lap cho 2v2 tu toan bo pool
-                pol1, path1 = self.opponent_pool.sample(is_1v1=False)
-                pol2, path2 = self.opponent_pool.sample(is_1v1=False)
-                self._current_opp_paths = [p for p in (path1, path2) if p]
-                self.opponent_policies = [p for p in (pol1, pol2) if p]
+                # 3v3 PFSP dong nhat: 1 doi thu nhan 3 tu pool 3v3
+                pol1, path1 = self.opponent_pool.sample(is_3v3_only=True)
+                self._current_opp_paths = [path1] if path1 else []
+                self.opponent_policies = [pol1, pol1, pol1] if pol1 else []
 
     def step(self, action):
         # Luu paths truoc khi super().step() co the goi _reset_positions()
@@ -213,28 +235,30 @@ class SelfPlayEnvA2(HaxballCurriculumEnv):
 
 # ── Callback ───────────────────────────────────────────────────────────────────
 class SelfPlayCallback(BaseCallback):
-    def __init__(self, opponent_pool: OpponentPool, model_dir: str, envs, verbose=1):
+    def __init__(self, opponent_pool: OpponentPoolA3, model_dir: str, envs, verbose=1):
         super().__init__(verbose)
         self.opponent_pool = opponent_pool
         self.model_dir = model_dir
         self.envs = envs
-        self.ckpt_dir = os.path.join(model_dir, "a2_checkpoints")
+        self.ckpt_dir = os.path.join(model_dir, "a3_checkpoints")
         self.best_reward = -np.inf
-        self.best_path = os.path.join(model_dir, "a2_best")
-        self.next_snapshot_at = SNAPSHOT_INTERVAL
+        self.best_path = os.path.join(model_dir, "a3_best")
+        self.next_snapshot_at = 3_000_000
         self.last_log_step = 0
+
+    def _get_next_snapshot_step(self, N: int) -> int:
+        accumulated = sum((k + 3) * 1_000_000 for k in range(N))
+        return accumulated + (N + 3) * 1_000_000
 
     def _on_training_start(self) -> None:
         existing = [f for f in os.listdir(self.ckpt_dir)
                     if f.startswith("snapshot_") and f.endswith(".zip")]
         N = len(existing)
+        self.next_snapshot_at = self._get_next_snapshot_step(N)
         if N > 0:
-            accumulated = sum((k + 1) * SNAPSHOT_INTERVAL for k in range(N))
-            self.next_snapshot_at = accumulated + (N + 1) * SNAPSHOT_INTERVAL
-            log.info(f"[A2] Resume: {N} snapshot(s) da co, next snapshot tai step {self.next_snapshot_at:,}")
+            log.info(f"[A3] Resume: {N} snapshot(s) da co, next snapshot tai step {self.next_snapshot_at:,}")
         else:
-            self.next_snapshot_at = SNAPSHOT_INTERVAL
-        log.info(f"[A2] Next snapshot tai step {self.next_snapshot_at:,}")
+            log.info(f"[A3] Next snapshot tai step {self.next_snapshot_at:,}")
 
     def _on_step(self) -> bool:
         # 1. Dong bo timestep va current_model (dong doi = agent dang train)
@@ -252,15 +276,15 @@ class SelfPlayCallback(BaseCallback):
             snap_name = f"snapshot_{self.num_timesteps}"
             path = os.path.join(self.ckpt_dir, f"{snap_name}.zip")
             self.model.save(path)
-            log.info(f"[A2] Saved snapshot -> {path}")
+            log.info(f"[A3] Saved snapshot -> {path}")
 
-            # Them vao pool doi thu (a2 snapshot = 2v2 model, khong dung cho 1v1)
+            # Them vao pool doi thu (a3 snapshot = 3v3 model, khong dung cho 1v1)
             self.opponent_pool.add(path, is_1v1_model=False)
 
             existing = [f for f in os.listdir(self.ckpt_dir)
                         if f.startswith("snapshot_") and f.endswith(".zip")]
             N = len(existing)
-            self.next_snapshot_at += N * SNAPSHOT_INTERVAL  # tang dan
+            self.next_snapshot_at = self._get_next_snapshot_step(N)
 
         # 4. Best reward tracking
         rew = self.logger.name_to_value.get("rollout/ep_rew_mean", None)
@@ -269,9 +293,9 @@ class SelfPlayCallback(BaseCallback):
                 self.best_reward = rew
                 self.model.save(self.best_path)
                 if self.verbose:
-                    log.info(f"[A2] New best: {rew:.3f} -> {self.best_path}.zip")
+                    log.info(f"[A3] New best: {rew:.3f} -> {self.best_path}.zip")
             if rew >= TARGET_REWARD:
-                log.info(f"[A2] Target reached! ep_rew_mean={rew:.3f}")
+                log.info(f"[A3] Target reached! ep_rew_mean={rew:.3f}")
                 return False
 
         return True
@@ -279,7 +303,7 @@ class SelfPlayCallback(BaseCallback):
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 def parse_args():
-    p = argparse.ArgumentParser(description="train_a2 — 2v2 PFSP, dong doi = agent dang train")
+    p = argparse.ArgumentParser(description="train_a3 — 3v3 PFSP, dong doi = agent dang train")
     p.add_argument("--initial-model", default="models/a1_final.zip")
     p.add_argument("--resume",        default=None)
     p.add_argument("--steps",         default=100_000_000, type=int)
@@ -292,10 +316,10 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
 
-    os.makedirs("models/a2_checkpoints", exist_ok=True)
+    os.makedirs("models/a3_checkpoints", exist_ok=True)
 
     # 1. Khoi tao opponent pool
-    pool = OpponentPool()
+    pool = OpponentPoolA3()
 
     # a1 snapshots — toan bo 1v1 agents da train
     a1_snaps = sorted(
@@ -304,12 +328,12 @@ if __name__ == "__main__":
     )
     for p in a1_snaps:
         pool.add(p, is_1v1_model=True)
-    log.info(f"[A2] {len(a1_snaps)} a1 snapshot(s) loaded.")
+    log.info(f"[A3] {len(a1_snaps)} a1 snapshot(s) loaded.")
 
     if os.path.exists("models/a1_final.zip"):
         pool.add("models/a1_final.zip", is_1v1_model=True)
     else:
-        log.warning("[A2] models/a1_final.zip not found!")
+        log.warning("[A3] models/a1_final.zip not found!")
 
     # a1.1 snapshots (neu co)
     a1_1_snaps = sorted(
@@ -319,24 +343,24 @@ if __name__ == "__main__":
     for p in a1_1_snaps:
         pool.add(p, is_1v1_model=True)
     if a1_1_snaps:
-        log.info(f"[A2] {len(a1_1_snaps)} a1.1 snapshot(s) loaded.")
+        log.info(f"[A3] {len(a1_1_snaps)} a1.1 snapshot(s) loaded.")
 
-    # a2 snapshots hien co (khi resume)
-    a2_snaps = sorted(
-        glob.glob("models/a2_checkpoints/snapshot_*.zip"),
+    # a3 snapshots hien co (khi resume)
+    a3_snaps = sorted(
+        glob.glob("models/a3_checkpoints/snapshot_*.zip"),
         key=lambda f: int(os.path.basename(f).replace("snapshot_", "").replace(".zip", ""))
     )
-    for p in a2_snaps:
+    for p in a3_snaps:
         pool.add(p, is_1v1_model=False)
-    if a2_snaps:
-        log.info(f"[A2] {len(a2_snaps)} existing a2 snapshot(s) loaded.")
+    if a3_snaps:
+        log.info(f"[A3] {len(a3_snaps)} existing a3 snapshot(s) loaded.")
 
-    log.info(f"[A2] Opponent pool khoi tao: {len(pool.pool)} agents.")
+    log.info(f"[A3] Opponent pool khoi tao: {len(pool.pool)} agents.")
     pool.log_stats()
 
     # 2. Tao moi truong
     def make_env():
-        return SelfPlayEnvA2(opponent_pool=pool, p_1v1=args.p_1v1)
+        return SelfPlayEnvA3(opponent_pool=pool, p_1v1=args.p_1v1)
 
     vec_env = DummyVecEnv([make_env for _ in range(N_ENVS)])
     vec_env = VecMonitor(vec_env)
@@ -345,12 +369,12 @@ if __name__ == "__main__":
     custom_objects = {k: v for k, v in PPO_PARAMS.items() if k != "policy_kwargs"}
 
     if args.resume:
-        log.info(f"[A2] Resuming tu {args.resume}")
+        log.info(f"[A3] Resuming tu {args.resume}")
         model = PPO.load(args.resume, env=vec_env, custom_objects=custom_objects)
         model.set_env(vec_env)
         is_resume = True
     else:
-        log.info(f"[A2] Tai model tu {args.initial_model}")
+        log.info(f"[A3] Tai model tu {args.initial_model}")
         model = PPO.load(args.initial_model, env=vec_env, custom_objects=custom_objects)
         model.set_env(vec_env)
         is_resume = False
@@ -366,12 +390,12 @@ if __name__ == "__main__":
     # 5. Steps con lai
     if is_resume:
         remaining_steps = max(args.steps - model.num_timesteps, 0)
-        log.info(f"[A2] Resume tu step {model.num_timesteps:,} — con {remaining_steps:,} steps")
+        log.info(f"[A3] Resume tu step {model.num_timesteps:,} — con {remaining_steps:,} steps")
     else:
         remaining_steps = args.steps
 
     log.info(
-        f"[A2] Bat dau — {N_ENVS} envs | {remaining_steps:,} steps | "
+        f"[A3] Bat dau — {N_ENVS} envs | {remaining_steps:,} steps | "
         f"p_1v1={args.p_1v1} | {len(pool.pool)} opponents | PFSP min_games={PFSP_MIN_GAMES}"
     )
 
@@ -384,5 +408,5 @@ if __name__ == "__main__":
         progress_bar        = True,
     )
 
-    model.save("models/a2_final")
-    log.info("[A2] Done -> models/a2_final.zip")
+    model.save("models/a3_final")
+    log.info("[A3] Done -> models/a3_final.zip")
