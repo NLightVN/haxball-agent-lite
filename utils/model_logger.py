@@ -3,7 +3,7 @@ utils/model_logger.py — Per-model file logger.
 
 Usage:
     from utils.model_logger import get_model_logger
-    log = get_model_logger("a0.1")   # writes to models/a0.1/training.log
+    log = get_model_logger("a1.1_0")   # writes to logs/a1.1_0/training.log
     log.info("Training started")
 """
 
@@ -12,7 +12,7 @@ import os
 import sys
 
 
-def get_model_logger(model_name: str, log_dir: str = "models") -> logging.Logger:
+def get_model_logger(model_name: str, log_dir: str = "logs") -> logging.Logger:
     """
     Returns a Logger that writes to:
         <log_dir>/<model_name>/training.log
@@ -21,8 +21,8 @@ def get_model_logger(model_name: str, log_dir: str = "models") -> logging.Logger
     is preserved exactly as before.
 
     Args:
-        model_name: e.g. "a0", "a0.1", "a1.1", "a1.2"
-        log_dir:    root models directory (default "models")
+        model_name: e.g. "a0", "a1.1_0", "a1.1_1", "a1.2"
+        log_dir:    root logs directory (default "logs")
 
     Returns:
         A configured logging.Logger instance.

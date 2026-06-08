@@ -1,10 +1,10 @@
 """
-eval_render.py — Visual evaluation: watch a trained A1 model play against A0 / bots.
+eval_render.py — Visual evaluation: watch a trained A1.1_1 model play against A0 / bots.
 
 Usage:
-    python eval_render.py --a1-model models/a1_best --a0-model models/a0_final
-    python eval_render.py --a1-model models/a1_best --a0-model models/a0_final --opponent Defender
-    python eval_render.py --a1-model models/a1_best --opponent human   # YOU control the opponent!
+    python eval_render.py --a1.1_1-model models/a1_1_best --a0-model models/a0_final
+    python eval_render.py --a1.1_1-model models/a1_1_best --a0-model models/a0_final --opponent Defender
+    python eval_render.py --a1.1_1-model models/a1_1_best --opponent human   # YOU control the opponent!
 
 Controls (while window is open):
     SPACE   — pause / resume
@@ -27,7 +27,7 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH = "models/a1_final.zip"   # Path to A1 model .zip
+A1_1_MODEL_PATH = "models/a1_1_final.zip"   # Path to A1.1_1 model .zip
 A0_MODEL_PATH = None                    # Path to A0 model .zip (used as opponent if Opponent is Trained)
 OPPONENT = "Defender"                   # Defender | Attacker | Hybrid | Follower | Trained | random | human
 GOAL_SIZE = 65.0                        # Goal half-height in physics units
@@ -158,7 +158,7 @@ def draw_players(screen, env, surf_rect):
         if i == 0:
             # Agent: determine colour by team
             color = C_AGENT if env.team_id == 1 else C_OPP
-            label = "A1"
+            label = "A1.1_1"
         else:
             color = C_OPP if env.team_id == 1 else C_AGENT
             label = env.opponent_type[:3] if env.opponent_type else "BOT"
@@ -268,19 +268,19 @@ def draw_panel(screen, env, step, ep_reward, episode, total_eps,
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
-    print(f"Loading A1 model: {A1_MODEL_PATH}")
-    a1_model = PPO.load(A1_MODEL_PATH, device="cpu")
+    print(f"Loading A1.1_1 model: {A1_1_MODEL_PATH}")
+    a1_1_model = PPO.load(A1_1_MODEL_PATH, device="cpu")
 
     pygame.init()
     screen = pygame.display.set_mode((WIN_W, WIN_H))
-    pygame.display.set_caption("Haxball — A1 Eval")
+    pygame.display.set_caption("Haxball — A1.1_1 Eval")
     clock = pygame.time.Clock()
     init_fonts()
 
     # Field surface rect (below panel, with 5px margin)
     field_rect = pygame.Rect(5, PANEL_H + 5, WIN_W - 10, FIELD_H)
 
-    env = HaxballCurriculumEnv(phase="A1")
+    env = HaxballCurriculumEnv(phase="A1.1_1")
     if A0_MODEL_PATH:
         env.a0_model_path = A0_MODEL_PATH
 
@@ -390,7 +390,7 @@ def main():
         if now - last_step_t >= STEP_INTERVAL:
             if is_human_opp:
                 env.human_opponent_action = get_human_action()
-            action, _ = a1_model.predict(obs, deterministic=DETERMINISTIC)
+            action, _ = a1_1_model.predict(obs, deterministic=DETERMINISTIC)
             obs, reward, terminated, truncated, _ = env.step(action)
             ep_reward += reward
             step_cnt  += 1

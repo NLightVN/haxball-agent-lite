@@ -17,15 +17,15 @@ class CurriculumManagerCallback(BaseCallback):
         self.best_a0_model_path = os.path.join(save_path, "A0_baseline.zip")
         self.phase = 'A0'
         
-        # A1 Opponent Pools
+        # A1.1_1 Opponent Pools
         self.previously_trained_opponent = None # Path to latest frozen opponent
         self.better_op_pool = []
         self.worse_op_pool = []
         
-        # A1 tracking
-        self.a1_episodes = 0
-        self.a1_eval_games = 0
-        self.a1_eval_wins = 0
+        # A1.1_1 tracking
+        self.a1_1_episodes = 0
+        self.a1_1_eval_games = 0
+        self.a1_1_eval_wins = 0
 
     def _on_step(self) -> bool:
         # Sync timesteps to environment for logging (if needed)
@@ -33,36 +33,36 @@ class CurriculumManagerCallback(BaseCallback):
             env.total_timesteps_elapsed = self.num_timesteps
             
         if self.phase == 'A0':
-            # Check if we should transition to A1
+            # Check if we should transition to A1.1_1
             if "rollout/ep_rew_mean" in self.logger.name_to_value:
                 ep_rew_mean = self.logger.name_to_value.get("rollout/ep_rew_mean", 0)
                 if ep_rew_mean >= 2.5:
                     print(f"\\n--- A0 Target Reached (rew_mean={ep_rew_mean:.2f} >= 2.5) at step {self.num_timesteps} ---")
                     self.model.save(self.best_a0_model_path)
                     self.previously_trained_opponent = self.best_a0_model_path
-                    self.transition_to_a1()
+                    self.transition_to_a1_1_1()
         else:
-            # Phase A1
+            # Phase A1.1_1
             # Every 20 episodes, we evaluate against previously_trained_opponent.
             # To do this cleanly within SB3, we count 'dones' (episodes finished)
             dones = self.locals.get("dones", [False])
             # For each done, we check if it was against the 'evaluate' opponent
             for i, d in enumerate(dones):
                 if d:
-                    self.a1_episodes += 1
+                    self.a1_1_episodes += 1
                     env = self.envs.envs[i]
                     if getattr(env, 'is_eval_game', False):
-                        self.a1_eval_games += 1
+                        self.a1_1_eval_games += 1
                         # If agent (team_id) won (score >= 3)
                         agent_idx = env.team_id - 1
                         if env.scores[agent_idx] >= 3:
-                            self.a1_eval_wins += 1
+                            self.a1_1_eval_wins += 1
                             
             # If 20 eval games hit, process pool update
-            if self.a1_eval_games >= 20:
-                win_rate = self.a1_eval_wins / self.a1_eval_games
+            if self.a1_1_eval_games >= 20:
+                win_rate = self.a1_1_eval_wins / self.a1_1_eval_games
                 print(f"\\n--- Evaluated against previous_trained: Win Rate = {win_rate:.2f} ---")
-                self.logger.record("curriculum/a1_win_rate", win_rate)
+                self.logger.record("curriculum/a1_1_win_rate", win_rate)
                 
                 # Freeze current model to become a new trained opponent
                 latest_path = os.path.join(self.save_path, f"trained_op_{self.num_timesteps}.zip")
@@ -83,33 +83,33 @@ class CurriculumManagerCallback(BaseCallback):
                     self.current_sampling_pool = [self.previously_trained_opponent] + self.better_op_pool + self.worse_op_pool
                     
                 self.previously_trained_opponent = latest_path
-                self.a1_eval_games = 0
-                self.a1_eval_wins = 0
+                self.a1_1_eval_games = 0
+                self.a1_1_eval_wins = 0
 
             # Assign new random opponents to any recently `done` envs
             for i, d in enumerate(dones):
                 if d:
                     env = self.envs.envs[i]
-                    self._assign_a1_opponent(env)
+                    self._assign_a1_1_opponent(env)
 
         return True
 
-    def transition_to_a1(self):
-        print("Transitioning environments to A1 phase...")
-        self.phase = 'A1'
-        self.a1_episodes = 0
-        self.a1_start_timestep = self.num_timesteps
+    def transition_to_a1_1_1(self):
+        print("Transitioning environments to A1.1_1 phase...")
+        self.phase = 'A1.1_1'
+        self.a1_1_episodes = 0
+        self.a1_1_start_timestep = self.num_timesteps
         self.current_sampling_pool = [self.previously_trained_opponent]
         
         for env in self.envs.envs:
-            env.phase = 'A1'
-            self._assign_a1_opponent(env)
+            env.phase = 'A1.1_1'
+            self._assign_a1_1_opponent(env)
             env.reset()
 
-    def _assign_a1_opponent(self, env):
+    def _assign_a1_1_opponent(self, env):
         # Time threshold sampling ratios: [Follower, Defender, Trained]
         # We define steps relative to transition point
-        t = self.num_timesteps - self.a1_start_timestep
+        t = self.num_timesteps - self.a1_1_start_timestep
         if t < 500_000:
             probs = [0.25, 0.25, 0.50]
         elif t < 1_000_000:

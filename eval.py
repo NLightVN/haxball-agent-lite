@@ -1,5 +1,5 @@
 """
-eval.py — Evaluate a trained A0 (or A1) model.
+eval.py — Evaluate a trained A0 (or A1.1_1) model.
 
 Usage:
     python eval.py --model models/a0_best.zip
@@ -82,7 +82,7 @@ def render_frame(env, step, reward, ep_reward, result_str=""):
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--model",    required=True,  help="Path to .zip model file")
-    p.add_argument("--phase",    default="A0",   help="A0 or A1 (default: A0)")
+    p.add_argument("--phase",    default="A0",   help="A0 or A1.1_1 (default: A0)")
     p.add_argument("--episodes", default=100,    type=int,   help="Number of episodes")
     p.add_argument("--render",      action="store_true",        help="Show ASCII field")
     p.add_argument("--delay",        default=0.05,   type=float, help="Seconds per frame (default 0.05)")

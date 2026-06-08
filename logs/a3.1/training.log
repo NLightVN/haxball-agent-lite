@@ -1,0 +1,131 @@
+2026-06-06 16:07:42 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\logs\a3.1\training.log
+2026-06-06 16:07:42 [INFO] [A3.1] Load initial model: models/initialization/a0_checkpoints/a0_3000000_steps.zip
+2026-06-06 16:07:44 [INFO] [A3.1] Bắt đầu — 8 envs | 30,000,000 steps | Map 3v3 to | Self-play dynamic interval
+2026-06-06 16:07:44 [INFO] [A3.1] Bắt đầu huấn luyện, snapshot đầu tiên tại 2,000,000
+2026-06-06 16:18:26 [INFO] [A3.1] Saved snapshot → models/3v3 oriented/a3_1_checkpoints\snapshot_2000000.zip
+2026-06-06 16:18:26 [INFO] [SelfPlay] Loading opponent 'snapshot_2000000' from models/3v3 oriented/a3_1_checkpoints\snapshot_2000000.zip...
+2026-06-06 16:18:26 [INFO] 
+--- SelfPlay Opponent Winrates (A3.1) ---
+2026-06-06 16:18:26 [INFO] Agent Pool: snapshot_2000000
+2026-06-06 16:18:26 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-06-06 16:18:26 [INFO] Terminated Pool: 
+2026-06-06 16:18:26 [INFO] Stats:
+2026-06-06 16:18:26 [INFO]   snapshot_2000000: No matches yet
+2026-06-06 16:18:26 [INFO] ------------------------------------------
+2026-06-06 16:25:19 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\logs\a3.1\training.log
+2026-06-06 16:25:19 [INFO] [A3.1] Load initial model: models/initialization/a0_checkpoints/a0_3000000_steps.zip
+2026-06-06 16:25:20 [INFO] [A3.1] Bắt đầu — 8 envs | 30,000,000 steps | Map 3v3 to | Self-play dynamic interval
+2026-06-06 16:25:20 [INFO] [A3.1] Bắt đầu huấn luyện, snapshot đầu tiên tại 2,000,000
+2026-06-06 16:50:13 [INFO] [A3.1] Saved snapshot → models/3v3 oriented/a3_1_checkpoints\snapshot_2000000.zip
+2026-06-06 16:50:13 [INFO] [SelfPlay] Loading opponent 'snapshot_2000000' from models/3v3 oriented/a3_1_checkpoints\snapshot_2000000.zip...
+2026-06-06 16:50:13 [INFO] 
+--- SelfPlay Opponent Winrates (A3.1) ---
+2026-06-06 16:50:13 [INFO] Agent Pool: snapshot_2000000
+2026-06-06 16:50:13 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-06-06 16:50:13 [INFO] Terminated Pool: 
+2026-06-06 16:50:13 [INFO] Stats:
+2026-06-06 16:50:13 [INFO]   snapshot_2000000: No matches yet
+2026-06-06 16:50:13 [INFO] ------------------------------------------
+2026-06-06 17:37:36 [INFO] [A3.1] Saved snapshot → models/3v3 oriented/a3_1_checkpoints\snapshot_4000000.zip
+2026-06-06 17:37:36 [INFO] [SelfPlay] Loading opponent 'snapshot_4000000' from models/3v3 oriented/a3_1_checkpoints\snapshot_4000000.zip...
+2026-06-06 17:37:36 [INFO] 
+--- SelfPlay Opponent Winrates (A3.1) ---
+2026-06-06 17:37:36 [INFO] Agent Pool: snapshot_2000000, snapshot_4000000
+2026-06-06 17:37:36 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-06-06 17:37:36 [INFO] Terminated Pool: 
+2026-06-06 17:37:36 [INFO] Stats:
+2026-06-06 17:37:36 [INFO]   snapshot_2000000: 47.2% (1832/3878)
+2026-06-06 17:37:36 [INFO]   snapshot_4000000: No matches yet
+2026-06-06 17:37:36 [INFO] ------------------------------------------
+2026-06-06 17:55:07 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\logs\a3.1\training.log
+2026-06-06 17:55:07 [INFO] [A3.1] Load initial model: models/initialization/a0_checkpoints/a0_3000000_steps.zip
+2026-06-06 17:55:09 [INFO] [A3.1] Bắt đầu — 8 envs | 30,000,000 steps | Map 3v3 to | Self-play dynamic interval
+2026-06-06 17:55:09 [INFO] [A3.1] Bắt đầu huấn luyện, snapshot đầu tiên tại 2,000,000
+2026-06-06 18:09:35 [INFO] [A3.1] Saved snapshot → models/3v3 oriented/a3_1_checkpoints\snapshot_2000000.zip
+2026-06-06 18:09:35 [INFO] [SelfPlay] Loading opponent 'snapshot_2000000' from models/3v3 oriented/a3_1_checkpoints\snapshot_2000000.zip...
+2026-06-06 18:09:35 [INFO] 
+--- SelfPlay Opponent Winrates (A3.1) ---
+2026-06-06 18:09:35 [INFO] Agent Pool: snapshot_2000000
+2026-06-06 18:09:35 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-06-06 18:09:35 [INFO] Terminated Pool: 
+2026-06-06 18:09:35 [INFO] Stats:
+2026-06-06 18:09:35 [INFO]   snapshot_2000000: No matches yet
+2026-06-06 18:09:35 [INFO] ------------------------------------------
+2026-06-06 19:13:39 [INFO] [A3.1] Saved snapshot → models/3v3 oriented/a3_1_checkpoints\snapshot_4000000.zip
+2026-06-06 19:13:39 [INFO] [SelfPlay] Loading opponent 'snapshot_4000000' from models/3v3 oriented/a3_1_checkpoints\snapshot_4000000.zip...
+2026-06-06 19:13:39 [INFO] 
+--- SelfPlay Opponent Winrates (A3.1) ---
+2026-06-06 19:13:39 [INFO] Agent Pool: snapshot_2000000, snapshot_4000000
+2026-06-06 19:13:39 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-06-06 19:13:39 [INFO] Terminated Pool: 
+2026-06-06 19:13:39 [INFO] Stats:
+2026-06-06 19:13:39 [INFO]   snapshot_2000000: 48.1% (4912/10216)
+2026-06-06 19:13:39 [INFO]   snapshot_4000000: No matches yet
+2026-06-06 19:13:39 [INFO] ------------------------------------------
+2026-06-06 20:24:40 [INFO] [A3.1] Saved snapshot → models/3v3 oriented/a3_1_checkpoints\snapshot_7000000.zip
+2026-06-06 20:24:40 [INFO] [SelfPlay] Loading opponent 'snapshot_7000000' from models/3v3 oriented/a3_1_checkpoints\snapshot_7000000.zip...
+2026-06-06 20:24:40 [INFO] 
+--- SelfPlay Opponent Winrates (A3.1) ---
+2026-06-06 20:24:40 [INFO] Agent Pool: snapshot_2000000, snapshot_4000000, snapshot_7000000
+2026-06-06 20:24:40 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-06-06 20:24:40 [INFO] Terminated Pool: 
+2026-06-06 20:24:40 [INFO] Stats:
+2026-06-06 20:24:40 [INFO]   snapshot_2000000: 45.4% (6206/13677)
+2026-06-06 20:24:40 [INFO]   snapshot_4000000: 35.0% (1096/3135)
+2026-06-06 20:24:40 [INFO]   snapshot_7000000: No matches yet
+2026-06-06 20:24:40 [INFO] ------------------------------------------
+2026-06-06 23:03:22 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\logs\a3.1\training.log
+2026-06-06 23:03:22 [INFO] [A3.1] Finetune từ a1.1_final: models/1v1 oriented/a1.1_final.zip
+2026-06-06 23:03:25 [INFO] [A3.1] Next snapshot tại step 250,000 (interval=250,000, pool_size=0)
+2026-06-06 23:03:25 [INFO] [A3.1] Bắt đầu finetune — 8 envs | 6,000,000 steps | Map 3v3 to | Bot-only 250,000 steps → Self-play dynamic 250k*(N+1)
+2026-06-06 23:03:25 [INFO] [A3.1] Fresh finetune từ a1.1_final. Bot-only phase: 250,000 steps. Snapshot đầu tiên tại step 500,000.
+2026-06-06 23:07:46 [INFO] [A3.1] Saved snapshot → models/3v3 oriented/a3_1_checkpoints\snapshot_500000.zip
+2026-06-06 23:07:46 [INFO] [SelfPlay] Loading opponent 'snapshot_500000' from models/3v3 oriented/a3_1_checkpoints\snapshot_500000.zip...
+2026-06-06 23:07:46 [INFO] 
+--- SelfPlay Opponent Winrates (A3.1) ---
+2026-06-06 23:07:46 [INFO] Agent Pool: snapshot_500000
+2026-06-06 23:07:46 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-06-06 23:07:46 [INFO] Terminated: 
+2026-06-06 23:07:46 [INFO] Stats:
+2026-06-06 23:07:46 [INFO]   snapshot_500000: No matches yet
+2026-06-06 23:07:46 [INFO] ------------------------------------------
+2026-06-06 23:07:46 [INFO] [A3.1] Next snapshot tại step 1,000,000 (interval=500,000, pool_size=1)
+2026-06-06 23:13:11 [INFO] [A3.1] Saved snapshot → models/3v3 oriented/a3_1_checkpoints\snapshot_1000000.zip
+2026-06-06 23:13:11 [INFO] [SelfPlay] Loading opponent 'snapshot_1000000' from models/3v3 oriented/a3_1_checkpoints\snapshot_1000000.zip...
+2026-06-06 23:13:11 [INFO] 
+--- SelfPlay Opponent Winrates (A3.1) ---
+2026-06-06 23:13:11 [INFO] Agent Pool: snapshot_500000, snapshot_1000000
+2026-06-06 23:13:11 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-06-06 23:13:11 [INFO] Terminated: 
+2026-06-06 23:13:11 [INFO] Stats:
+2026-06-06 23:13:11 [INFO]   snapshot_500000: 43.4% (157/362)
+2026-06-06 23:13:11 [INFO]   snapshot_1000000: No matches yet
+2026-06-06 23:13:11 [INFO] ------------------------------------------
+2026-06-06 23:13:11 [INFO] [A3.1] Next snapshot tại step 1,750,000 (interval=750,000, pool_size=2)
+2026-06-06 23:24:38 [INFO] [A3.1] Saved snapshot → models/3v3 oriented/a3_1_checkpoints\snapshot_1750000.zip
+2026-06-06 23:24:38 [INFO] [SelfPlay] Loading opponent 'snapshot_1750000' from models/3v3 oriented/a3_1_checkpoints\snapshot_1750000.zip...
+2026-06-06 23:24:38 [INFO] 
+--- SelfPlay Opponent Winrates (A3.1) ---
+2026-06-06 23:24:38 [INFO] Agent Pool: snapshot_500000, snapshot_1000000, snapshot_1750000
+2026-06-06 23:24:38 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-06-06 23:24:38 [INFO] Terminated: 
+2026-06-06 23:24:38 [INFO] Stats:
+2026-06-06 23:24:38 [INFO]   snapshot_500000: 36.6% (329/899)
+2026-06-06 23:24:38 [INFO]   snapshot_1000000: 40.5% (221/546)
+2026-06-06 23:24:38 [INFO]   snapshot_1750000: No matches yet
+2026-06-06 23:24:38 [INFO] ------------------------------------------
+2026-06-06 23:24:38 [INFO] [A3.1] Next snapshot tại step 2,750,000 (interval=1,000,000, pool_size=3)
+2026-06-06 23:41:29 [INFO] [A3.1] Saved snapshot → models/3v3 oriented/a3_1_checkpoints\snapshot_2750000.zip
+2026-06-06 23:41:29 [INFO] [SelfPlay] Loading opponent 'snapshot_2750000' from models/3v3 oriented/a3_1_checkpoints\snapshot_2750000.zip...
+2026-06-06 23:41:29 [INFO] 
+--- SelfPlay Opponent Winrates (A3.1) ---
+2026-06-06 23:41:29 [INFO] Agent Pool: snapshot_500000, snapshot_1000000, snapshot_1750000, snapshot_2750000
+2026-06-06 23:41:29 [INFO] Bot Pool: Wanderer, Pazzo, Random, Static
+2026-06-06 23:41:29 [INFO] Terminated: 
+2026-06-06 23:41:29 [INFO] Stats:
+2026-06-06 23:41:29 [INFO]   snapshot_500000: 27.5% (435/1582)
+2026-06-06 23:41:29 [INFO]   snapshot_1000000: 33.2% (376/1134)
+2026-06-06 23:41:29 [INFO]   snapshot_1750000: 36.7% (251/683)
+2026-06-06 23:41:29 [INFO]   snapshot_2750000: No matches yet
+2026-06-06 23:41:29 [INFO] ------------------------------------------
+2026-06-06 23:41:29 [INFO] [A3.1] Next snapshot tại step 4,000,000 (interval=1,250,000, pool_size=4)

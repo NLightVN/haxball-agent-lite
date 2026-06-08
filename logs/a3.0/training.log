@@ -1,0 +1,12 @@
+2026-06-06 20:59:10 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\logs\a3.0\training.log
+2026-06-06 20:59:10 [INFO] [A3.0] Starting from A0 base model: models/initialization/a0_checkpoints/a0_3000000_steps.zip
+2026-06-06 20:59:12 [INFO] [A3.0] Starting — 8 envs, 2,000,000 steps to go
+2026-06-06 21:02:04 [INFO] [A3.0] Saved snapshot to models/3v3 oriented/a3_0_checkpoints\a3_0_snapshot_250000.zip
+2026-06-06 21:03:01 [INFO] [A3.0] Saved snapshot to models/3v3 oriented/a3_0_checkpoints\a3_0_snapshot_500000.zip
+2026-06-06 21:03:58 [INFO] [A3.0] Saved snapshot to models/3v3 oriented/a3_0_checkpoints\a3_0_snapshot_750000.zip
+2026-06-06 21:05:44 [INFO] [A3.0] Saved snapshot to models/3v3 oriented/a3_0_checkpoints\a3_0_snapshot_1000000.zip
+2026-06-06 21:07:48 [INFO] [A3.0] Saved snapshot to models/3v3 oriented/a3_0_checkpoints\a3_0_snapshot_1250000.zip
+2026-06-06 21:10:03 [INFO] [A3.0] Saved snapshot to models/3v3 oriented/a3_0_checkpoints\a3_0_snapshot_1500000.zip
+2026-06-06 21:12:41 [INFO] [A3.0] Saved snapshot to models/3v3 oriented/a3_0_checkpoints\a3_0_snapshot_1750000.zip
+2026-06-06 21:14:02 [INFO] [A3.0] Saved snapshot to models/3v3 oriented/a3_0_checkpoints\a3_0_snapshot_2000000.zip
+2026-06-06 21:14:06 [INFO] [A3.0] Done -> models/3v3 oriented/a3_0_final.zip

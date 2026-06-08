@@ -16,7 +16,7 @@ def run_mirror(model_path_a, model_path_b, n_episodes=200, max_steps=1350):
     print(f"Loading Model B: {model_path_b}")
     model_b = PPO.load(model_path_b, device="cpu")
 
-    env = HaxballCurriculumEnv(phase="A1")
+    env = HaxballCurriculumEnv(phase="A1.1_1")
     env.forced_opponent_type = "Trained"
     env.opponent_policy = model_b
 
@@ -83,8 +83,8 @@ def run_mirror(model_path_a, model_path_b, n_episodes=200, max_steps=1350):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--model-a", default="models/a1_checkpoints/snapshot_1000000.zip")
-    p.add_argument("--model-b", default="models/a1_checkpoints/snapshot_1000000.zip")
+    p.add_argument("--model-a", default="models/a1_1_checkpoints/snapshot_1000000.zip")
+    p.add_argument("--model-b", default="models/a1_1_checkpoints/snapshot_1000000.zip")
     p.add_argument("--episodes", default=200, type=int)
     args = p.parse_args()
 

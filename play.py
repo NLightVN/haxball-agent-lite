@@ -23,18 +23,19 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH         = "models/a1.1_checkpoints/a1.1_snapshot_1000000.zip"  # Agent chính (và Đồng đội)
-OPPONENT_MODEL_PATH_1 = "models/a1.1_checkpoints/a1.1_snapshot_1000000.zip" # Đối thủ 1
-OPPONENT_MODEL_PATH_2 = "models/a1_checkpoints/snapshot_28000000.zip" # Đối thủ 2
-OPPONENT_MODEL_PATH_3 = "models/a1_checkpoints/snapshot_28000000.zip" # Đối thủ 3
+A3_1_MODEL_PATH         = "models/2v2 oriented/a3_1_checkpoints/snapshot_2750000.zip"  # Agent chính
+OPPONENT_MODEL_PATH_1 = "models/1v1 oriented/a1.1_checkpoints/snapshot_15000000.zip" # Đối thủ
+OPPONENT_MODEL_PATH_2 = None  # Không dùng trong phase A2.1_1
+OPPONENT_MODEL_PATH_3 = None  # Không dùng trong phase A2.1_1
 A0_MODEL_PATH = None
-OPPONENT = "Trained"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
-GOAL_SIZE = 85.0                        # Goal half-height in physics units
-DETERMINISTIC = True                    # Use deterministic policy actions
+OPPONENT = "Trained"                     # Defender | Attacker | Hybrid | Follower | Trained | Random | Human | Wanderer | Pazzo
+GOAL_SIZE = 85.0                        # Goal half-height in physics units (2v2 map)
+SPEED = 2.0                             # Speed multiplier (1.0 = real-time, 2.0 = double speed, etc.)
+DETERMINISTIC = False                   # Use deterministic policy actions
 
 # Display labels (auto-derived from model paths)
 _stem = lambda p: os.path.splitext(os.path.basename(p))[0] if p else None
-AGENT_LABEL  = _stem(A1_MODEL_PATH)   or "A1"
+AGENT_LABEL  = _stem(A3_1_MODEL_PATH)   or "A2.1_1"
 OPP_LABEL_1  = _stem(OPPONENT_MODEL_PATH_1) or "OPP1"
 OPP_LABEL_2  = _stem(OPPONENT_MODEL_PATH_2) or "OPP2"
 OPP_LABEL_3  = _stem(OPPONENT_MODEL_PATH_3) or "OPP3"
@@ -292,30 +293,28 @@ def draw_panel(screen, env, step, ep_reward, step_reward, episode, total_eps,
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
-    print(f"Loading model: {A1_MODEL_PATH}")
-    a1_model = PPO.load(A1_MODEL_PATH, device="cpu")
+    print(f"Loading model: {A3_1_MODEL_PATH}")
+    a3_1_model = PPO.load(A3_1_MODEL_PATH, device="cpu")
     
-    print(f"Loading opponent model 1: {OPPONENT_MODEL_PATH_1}")
+    print(f"Loading opponent model: {OPPONENT_MODEL_PATH_1}")
     opp_model_1 = PPO.load(OPPONENT_MODEL_PATH_1, device="cpu")
-
-    print(f"Loading opponent model 2: {OPPONENT_MODEL_PATH_2}")
-    opp_model_2 = PPO.load(OPPONENT_MODEL_PATH_2, device="cpu")
-
-    print(f"Loading opponent model 3: {OPPONENT_MODEL_PATH_3}")
-    opp_model_3 = PPO.load(OPPONENT_MODEL_PATH_3, device="cpu")
+    opp_model_2 = None
+    opp_model_3 = None
 
     pygame.init()
     screen = pygame.display.set_mode((WIN_W, WIN_H))
-    pygame.display.set_caption("Haxball — A3 Play")
+    pygame.display.set_caption("Haxball — A2.1_1 Play (3v3 map)")
     clock = pygame.time.Clock()
     init_fonts()
 
     # Field surface rect (below panel, with 5px margin)
     field_rect = pygame.Rect(5, PANEL_H + 5, WIN_W - 10, FIELD_H)
 
-    env = HaxballCurriculumEnv(phase="A3")
-    env.current_model = a1_model
-    env.opponent_policies = [opp_model_1, opp_model_2, opp_model_3]
+    env = HaxballCurriculumEnv(phase="A2.1_1", p_1v1=1.0)
+    env.current_model = a3_1_model
+    # Phase A2.1_1: 1v1 trên map 3v3 to, chỉ cần 1 opponent
+    env.opponent_policies = [opp_model_1]
+    env.opponent_deterministic = True  # Opponent chơi deterministic như agent (không bị stochastic)
     
     if A0_MODEL_PATH:
         env.a0_model_path = A0_MODEL_PATH
@@ -370,7 +369,7 @@ def main():
     # ── Physics timing ────────────────────────────────────────────────────────
     # Each env.step() = frame_skip=3 ticks @ 60Hz → 50ms per step = 20 steps/s
     RENDER_FPS    = 60
-    STEP_INTERVAL = 1.0 / 20.0   # 20 steps/s  (3 ticks × 60Hz = correct real-time)
+    STEP_INTERVAL = (1.0 / 20.0) / SPEED   # 20 steps/s divided by speed multiplier
 
     paused          = False
     running         = True
@@ -449,7 +448,7 @@ def main():
         if now - last_step_t >= STEP_INTERVAL:
             if is_human_opp:
                 env.human_opponent_action = get_human_action()
-            action, _ = a1_model.predict(obs, deterministic=DETERMINISTIC)
+            action, _ = a3_1_model.predict(obs, deterministic=DETERMINISTIC)
             obs, reward, terminated, truncated, _ = env.step(action)
             step_reward = reward
             ep_reward  += reward
