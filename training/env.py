@@ -615,7 +615,7 @@ class HaxballCurriculumEnv(gym.Env):
                 # Agent scored
                 self.scores[self.team_id - 1] += 1
                 if self.phase == 'MAIN_1V1':
-                    reward += 5.0 + (self.max_steps - self.step_count) * 0.0016
+                    reward += 10.0 + (self.max_steps - self.step_count) * 0.0016
                 else:
                     reward += 30.0
                 goal_scored = True
@@ -625,7 +625,7 @@ class HaxballCurriculumEnv(gym.Env):
                 opp_id = 2 if self.team_id == 1 else 1
                 self.scores[opp_id - 1] += 1
                 if self.phase == 'MAIN_1V1':
-                    reward += -5.0 - max(self._main_1v1_dense_reward_total, 0.0)
+                    reward += -10.0 - max(self._main_1v1_dense_reward_total, 0.0)
                 else:
                     reward -= 10.0
                 goal_scored = True
@@ -633,9 +633,9 @@ class HaxballCurriculumEnv(gym.Env):
 
             # Penalty/Reward logic for A1.2 / MAIN_1V1
             if self.phase == 'MAIN_1V1' and not goal_scored:
-                if self.last_touch == 'A' and cur_ball_spd >= 0.1:
-                    reward += 0.0015
-                    self._main_1v1_dense_reward_total += 0.0015
+                if self.last_touch == 'A' and cur_ball_spd >= 0.3:
+                    reward += 0.003
+                    self._main_1v1_dense_reward_total += 0.003
             elif self.phase == 'A1.2' and not goal_scored:
                 # Dense reward for ball advancing toward goal
                 cur_ball_dist_to_goal = _dist_to_goal_segment(
