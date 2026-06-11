@@ -219,12 +219,12 @@ class HaxballCurriculumEnv(gym.Env):
             self._rng = np.random.default_rng(seed)
 
         # ── Time Curriculum ──
-        if self.phase == 'A0':
-            ep_secs = 15 # 15 seconds (150 steps)
+        if self.phase in ('A0', 'MAIN_1V1'):
+            ep_secs = 15 # 15 seconds
         elif self.phase == 'A0.1':
             ep_secs = 30 # 30 seconds
         else:
-            ep_secs = 45 # 45 seconds (900 steps)
+            ep_secs = 45 # 45 seconds
         
         self.max_steps = ep_secs * PHYSICS_HZ // self.frame_skip
         self.step_count = 0
