@@ -615,7 +615,7 @@ class HaxballCurriculumEnv(gym.Env):
                 # Agent scored
                 self.scores[self.team_id - 1] += 1
                 if self.phase == 'MAIN_1V1':
-                    reward += 10.0 + (self.max_steps - self.step_count) * 0.0016
+                    reward += 10.0 + (self.max_steps - self.step_count) * 0.005
                 else:
                     reward += 30.0
                 goal_scored = True
