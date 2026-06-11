@@ -634,8 +634,13 @@ class HaxballCurriculumEnv(gym.Env):
             # Penalty/Reward logic for A1.2 / MAIN_1V1
             if self.phase == 'MAIN_1V1' and not goal_scored:
                 if self.last_touch == 'A':
-                    reward += 0.0015
-                    self._main_1v1_dense_reward_total += 0.0015
+                    reward += 0.0005
+                    self._main_1v1_dense_reward_total += 0.0005
+                
+                delta_dist = self._prev_ball_dist_to_goal - cur_ball_dist_to_goal
+                ball_adv_reward = delta_dist * (3.0 / DIAG)
+                reward += ball_adv_reward
+                self._main_1v1_dense_reward_total += ball_adv_reward
             elif self.phase == 'A1.2' and not goal_scored:
                 # Dense reward for ball advancing toward goal
                 cur_ball_dist_to_goal = _dist_to_goal_segment(
