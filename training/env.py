@@ -266,21 +266,11 @@ class HaxballCurriculumEnv(gym.Env):
         preset = cands[int(self._rng.integers(0, len(cands)))]
         
         if self.phase == 'A0':
-            # Field: 80% to 120%
-            scale_h = float(self._rng.uniform(0.8, 1.2))
-            scale_w = float(self._rng.uniform(0.8, 1.2))
-            self.HH = float(preset[1]) * scale_h
-            self.HW = float(preset[0]) * scale_w
-            if self.HH > self.HW:
-                self.HH, self.HW = self.HW, self.HH
-                
-            # Goal: 40% to 140% of preset (train with both narrow & wide goals)
-            self.goal_y = float(self._rng.uniform(0.4, 1.4)) * float(preset[2])
-            
-            # Goal center
-            padding = 10.0
-            max_center = max(0.0, self.HH - self.goal_y - padding)
-            self.goal_center_y = float(self._rng.uniform(-max_center, max_center))
+            # Map fixed 1v1
+            self.HH = float(preset[1])
+            self.HW = float(preset[0])
+            self.goal_y = 64.0
+            self.goal_center_y = 0.0
             
             # Spawn ball (speed 0)
             bx = float(self._rng.uniform(-self.HW * 0.7, self.HW * 0.7))
