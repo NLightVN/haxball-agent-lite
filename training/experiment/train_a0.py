@@ -22,7 +22,7 @@ log = get_model_logger("a0")
 N_ENVS          = 8          # parallel envs
 TOTAL_STEPS     = 5_000_000  # max training steps
 CHECKPOINT_FREQ = 50_000     # save every N steps (across all envs)
-TARGET_REWARD   = 3.0        # stop early when ep_rew_mean >= this
+TARGET_REWARD   = 12.0       # stop early when ep_rew_mean >= this
 # ── PPO config ─────────────────────────────────────────────────────────────────
 PPO_PARAMS = dict(
     n_steps      = 2048,    # rollout buffer per env

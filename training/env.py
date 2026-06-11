@@ -163,7 +163,7 @@ class HaxballCurriculumEnv(gym.Env):
         self.legacy_obs = legacy_obs
         self._rng = np.random.default_rng(seed)
         
-        self.frame_skip = 3 if self.phase in ('A1.2', 'A0.1', 'A1', 'MAIN_1V1') else FRAME_SKIP
+        self.frame_skip = 3 if self.phase in ('A0', 'A1.2', 'A0.1', 'A1', 'MAIN_1V1') else FRAME_SKIP
 
         # Gymnasium spaces
         self.obs_dim = 100 if self.legacy_obs else OBS_DIM
@@ -597,24 +597,16 @@ class HaxballCurriculumEnv(gym.Env):
         terminated = False
         truncated = False
 
-        if self.phase == 'A0':
-            if goal_result == 2:
-                # Scored into right goal ✅
-                reward = 5.0
-                terminated = True
-            else:
-                reward -= 0.003 # Dense punishment per step
-                
-            if not terminated and self.step_count >= self.max_steps:
-                truncated = True
+        if False: # self.phase == 'A0' logic has been merged below
+            pass
 
-        else: # A1 or A1.2 Phase
+        else: # A0, A1, A1.2 or MAIN_1V1 Phase
             # Goal logic
             goal_scored = False
             if goal_result == 2:
                 # Agent scored
                 self.scores[self.team_id - 1] += 1
-                if self.phase == 'MAIN_1V1':
+                if self.phase in ('MAIN_1V1', 'A0'):
                     reward += 10.0 + (self.max_steps - self.step_count) * 0.005
                 else:
                     reward += 30.0
@@ -624,15 +616,15 @@ class HaxballCurriculumEnv(gym.Env):
                 # Opponent scored
                 opp_id = 2 if self.team_id == 1 else 1
                 self.scores[opp_id - 1] += 1
-                if self.phase == 'MAIN_1V1':
+                if self.phase in ('MAIN_1V1', 'A0'):
                     reward += -10.0
                 else:
                     reward -= 10.0
                 goal_scored = True
                 self._reset_positions()
 
-            # Penalty/Reward logic for A1.2 / MAIN_1V1
-            if self.phase == 'MAIN_1V1' and not goal_scored:
+            # Penalty/Reward logic for A1.2 / MAIN_1V1 / A0
+            if self.phase in ('MAIN_1V1', 'A0') and not goal_scored:
                 if self.last_touch == 'A' and cur_ball_spd >= 0.3:
                     reward += 0.003
                     self._main_1v1_dense_reward_total += 0.003

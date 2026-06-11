@@ -130,3 +130,54 @@
 2026-06-11 18:48:24 [INFO]   snapshot_5000000: 14.3% (1/7)
 2026-06-11 18:48:24 [INFO]   snapshot_6000000: No matches yet
 2026-06-11 18:48:24 [INFO] ----------------------------------
+2026-06-11 19:52:54 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\haxball-agent-lite\models\main_1v1_train\training.log
+2026-06-11 19:52:54 [INFO] [SelfPlay] Starting training from scratch (no pretrained weights)
+2026-06-11 19:52:55 [INFO] [SelfPlay] Starting — 8 envs, 30,000,000 steps to go
+2026-06-11 19:52:55 [INFO] [SelfPlay] Priority: 50% snapshot category, 50% bot category (Wanderer/Pazzo/Random/Static)
+2026-06-11 20:04:39 [INFO] [SelfPlay] Saved snapshot to models/main-training-1v1/main_1v1_checkpoints\snapshot_1000000.zip
+2026-06-11 20:04:39 [INFO] [SelfPlay] Loading opponent 'snapshot_1000000' from models/main-training-1v1/main_1v1_checkpoints\snapshot_1000000.zip into memory...
+2026-06-11 20:04:39 [INFO] 
+--- SelfPlay Opponent Winrates ---
+2026-06-11 20:04:39 [INFO] Agent Pool: snapshot_1000000
+2026-06-11 20:04:39 [INFO] Bot Pool: Pazzo, Random, Static, Wanderer
+2026-06-11 20:04:39 [INFO] Terminated Pool: 
+2026-06-11 20:04:39 [INFO] Stats:
+2026-06-11 20:04:39 [INFO]   snapshot_1000000: No matches yet
+2026-06-11 20:04:39 [INFO] ----------------------------------
+2026-06-11 20:29:27 [INFO] [SelfPlay] Saved snapshot to models/main-training-1v1/main_1v1_checkpoints\snapshot_2000000.zip
+2026-06-11 20:29:27 [INFO] [SelfPlay] Loading opponent 'snapshot_2000000' from models/main-training-1v1/main_1v1_checkpoints\snapshot_2000000.zip into memory...
+2026-06-11 20:29:27 [INFO] 
+--- SelfPlay Opponent Winrates ---
+2026-06-11 20:29:27 [INFO] Agent Pool: snapshot_1000000, snapshot_2000000
+2026-06-11 20:29:27 [INFO] Bot Pool: Pazzo, Random, Static, Wanderer
+2026-06-11 20:29:27 [INFO] Terminated Pool: 
+2026-06-11 20:29:27 [INFO] Stats:
+2026-06-11 20:29:27 [INFO]   snapshot_1000000: 42.0% (84/200)
+2026-06-11 20:29:27 [INFO]   snapshot_2000000: No matches yet
+2026-06-11 20:29:27 [INFO] ----------------------------------
+2026-06-11 21:03:46 [INFO] [SelfPlay] Saved snapshot to models/main-training-1v1/main_1v1_checkpoints\snapshot_3000000.zip
+2026-06-11 21:03:46 [INFO] [SelfPlay] Loading opponent 'snapshot_3000000' from models/main-training-1v1/main_1v1_checkpoints\snapshot_3000000.zip into memory...
+2026-06-11 21:03:46 [INFO] 
+--- SelfPlay Opponent Winrates ---
+2026-06-11 21:03:46 [INFO] Agent Pool: snapshot_1000000, snapshot_2000000, snapshot_3000000
+2026-06-11 21:03:46 [INFO] Bot Pool: Pazzo, Random, Static, Wanderer
+2026-06-11 21:03:46 [INFO] Terminated Pool: 
+2026-06-11 21:03:46 [INFO] Stats:
+2026-06-11 21:03:46 [INFO]   snapshot_1000000: 36.0% (72/200)
+2026-06-11 21:03:46 [INFO]   snapshot_2000000: 52.5% (105/200)
+2026-06-11 21:03:46 [INFO]   snapshot_3000000: No matches yet
+2026-06-11 21:03:46 [INFO] ----------------------------------
+2026-06-11 21:14:46 [INFO] Logger initialised — writing to e:\Tran Quang Hung\haxball-agent-lite\haxball-agent-lite\models\main_1v1_train\training.log
+2026-06-11 21:14:46 [INFO] [SelfPlay] Starting training from scratch (no pretrained weights)
+2026-06-11 21:14:49 [INFO] [SelfPlay] Starting — 8 envs, 30,000,000 steps to go
+2026-06-11 21:14:49 [INFO] [SelfPlay] Priority: 50% snapshot category, 50% bot category (Wanderer/Pazzo/Random/Static)
+2026-06-11 21:22:24 [INFO] [SelfPlay] Saved snapshot to models/main-training-1v1/main_1v1_checkpoints\snapshot_1000000.zip
+2026-06-11 21:22:24 [INFO] [SelfPlay] Loading opponent 'snapshot_1000000' from models/main-training-1v1/main_1v1_checkpoints\snapshot_1000000.zip into memory...
+2026-06-11 21:22:24 [INFO] 
+--- SelfPlay Opponent Winrates ---
+2026-06-11 21:22:24 [INFO] Agent Pool: snapshot_1000000
+2026-06-11 21:22:24 [INFO] Bot Pool: Pazzo, Random, Static, Wanderer
+2026-06-11 21:22:24 [INFO] Terminated Pool: 
+2026-06-11 21:22:24 [INFO] Stats:
+2026-06-11 21:22:24 [INFO]   snapshot_1000000: No matches yet
+2026-06-11 21:22:24 [INFO] ----------------------------------
