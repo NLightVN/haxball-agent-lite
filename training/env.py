@@ -257,6 +257,7 @@ class HaxballCurriculumEnv(gym.Env):
         self._a0_1_steps_since_ball_record = 0
         self._a0_1_record_ball_to_goal_reward_total = 0.0
         self._main_1v1_dense_reward_total = 0.0
+        self._ball_slow_steps = 0
 
         return self._get_obs(), {}
 
@@ -585,6 +586,14 @@ class HaxballCurriculumEnv(gym.Env):
         a = self.agents[0]
         cur_dist     = math.hypot(a.x - self.ball.x, a.y - self.ball.y)
         cur_ball_spd = math.hypot(self.ball.xs, self.ball.ys)
+        
+        if cur_ball_spd < 0.1:
+            self._ball_slow_steps += 1
+            if self._ball_slow_steps >= 40:  # 40 steps = 2 seconds at 20 steps/sec
+                self.last_touch = None
+        else:
+            self._ball_slow_steps = 0
+            
         atk = self._attack_sign
         cur_ball_dist_to_goal = _dist_to_goal_segment(
             self.ball.x, self.ball.y,
