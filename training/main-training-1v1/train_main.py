@@ -301,7 +301,7 @@ if __name__ == "__main__":
         log.info("[SelfPlay] Starting training from scratch (no pretrained weights)")
         params = PPO_PARAMS.copy()
         params["tensorboard_log"] = "./tensorboard/main_1v1"
-        model = PPO("MlpPolicy", env=vec_env, verbose=1, **params)
+        model = PPO("MlpPolicy", env=vec_env, **params)
 
     is_resume = bool(args.resume)
 
