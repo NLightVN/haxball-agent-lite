@@ -636,10 +636,6 @@ class HaxballCurriculumEnv(gym.Env):
                 if self.last_touch == 'A' and cur_ball_spd >= 0.3:
                     reward += 0.003
                     self._main_1v1_dense_reward_total += 0.003
-                
-                field_diag = math.hypot(self.HW * 2.0, self.HH * 2.0)
-                dist_penalty = (cur_dist / field_diag) * 0.5
-                reward -= dist_penalty
             elif self.phase == 'A1.2' and not goal_scored:
                 # Dense reward for ball advancing toward goal
                 cur_ball_dist_to_goal = _dist_to_goal_segment(
