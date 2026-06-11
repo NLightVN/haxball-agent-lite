@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import random
 import numpy as np
 import pprint
@@ -152,20 +152,20 @@ if __name__ == "__main__":
     
     model = PPO("MlpPolicy", vec_env, verbose=1, tensorboard_log="./ppo_curriculum_tensorboard/")
     
-    os.makedirs("./models", exist_ok=True)
+    os.makedirs("./models/experiment", exist_ok=True)
     
     # Save a checkpoint every 100,000 total steps (100k / 4 envs = 25,000 per env)
     checkpoint_callback = CheckpointCallback(
         save_freq=max(100_000 // 4, 1),
-        save_path='./models/checkpoints/',
+        save_path='./models/experiment/checkpoints/',
         name_prefix='rl_model'
     )
     
-    curriculum_callback = CurriculumManagerCallback(vec_env, save_path="./models")
+    curriculum_callback = CurriculumManagerCallback(vec_env, save_path="./models/experiment")
     
     # Combine the custom curriculum callback with the checkpoint callback
     callback = CallbackList([checkpoint_callback, curriculum_callback])
     
     print("Starting Training...")
     model.learn(total_timesteps=3_000_000, callback=callback)
-    model.save("models/final_curriculum_model")
+    model.save("models/experiment/final_curriculum_model")

@@ -3,9 +3,9 @@ export_onnx.py — Export A1 PPO actor to ONNX for browser inference.
 
 Usage:
     python export_onnx.py
-    python export_onnx.py --model models/a1_final --out models/a1_final.onnx
+    python export_onnx.py --model models/experiment/a1_final --out models/experiment/a1_final.onnx
 
-Output: models/a1_final.onnx
+Output: models/experiment/a1_final.onnx
     Input  : obs   shape [1, 106]  float32
     Output : logits shape [1, 11]  float32  (9 dir + 2 kick, concatenated)
 """
@@ -36,8 +36,8 @@ class ActorWrapper(nn.Module):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--model", default="models/a1_final", help="SB3 model path (no .zip)")
-    p.add_argument("--out",   default="models/a1_final.onnx")
+    p.add_argument("--model", default="models/experiment/a1_final", help="SB3 model path (no .zip)")
+    p.add_argument("--out",   default="models/experiment/a1_final.onnx")
     p.add_argument("--obs-dim", default=106, type=int)
     args = p.parse_args()
 

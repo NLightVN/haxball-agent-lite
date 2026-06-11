@@ -1,19 +1,22 @@
 """
-train_a1.2.py — Self-Play Training.
+train_main.py — MAIN_1V1 Training.
 
 Episode types:
   • PRECISION : small goal (0.3–0.6×), no opponent → aim accuracy
   • OPPONENT  : goal 1.4×→0.6× over 2M steps, opponent = Sampled from self-play pool
 
 Usage:
-    python training/train_a1.2.py
+    python training/main-training-1v1/train_main.py
 """
 
 import argparse
+import collections
 import os
+os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 import sys
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT_DIR)
 os.chdir(ROOT_DIR)
 
@@ -22,16 +25,16 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from training.env import HaxballCurriculumEnv
 from utils.model_logger import get_model_logger
 
-log = get_model_logger("a1")
+log = get_model_logger("main_1v1_train")
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 N_ENVS          = 8
 TARGET_REWARD   = 15.0
-BOT_TYPES       = ('Wanderer', 'Pazzo', 'Random', 'Static')
+BOT_TYPES       = ('Pazzo', 'Random', 'Static', 'Wanderer')
 
 PPO_PARAMS = dict(
     n_steps      = 2048,
@@ -44,6 +47,7 @@ PPO_PARAMS = dict(
     clip_range   = 0.2,
     vf_coef      = 0.5,
     max_grad_norm= 0.5,
+    verbose      = 1,
     policy_kwargs= dict(net_arch=dict(pi=[256, 256], vf=[256, 256]))
 )
 
@@ -54,63 +58,94 @@ class OpponentManager:
         self.agent_pool = []
         self.bot_pool = list(BOT_TYPES)
         self.terminated_pool = []
+        self.exploiter_pool = []
+        self.exploiter_dir = "models/main-training-1v1/exploiter_checkpoints"
+        self.last_exploiter_refresh = 0
         
-        self.agent_idx = 0
-        self.terminated_idx = 0
-        
-        # Stats per opponent: wins = snapshot's wins (agent lost)
-        self.stats = {} # name -> {'wins': 0, 'total': 0}
+        # Stats per opponent: deque of booleans (True if opponent won)
+        self.stats = {} # name -> deque(maxlen=200)
 
     def add_opponent(self, name, model_path):
         log.info(f"[SelfPlay] Loading opponent '{name}' from {model_path} into memory...")
         policy = PPO.load(model_path, device='cpu')
         self.opponents[name] = policy
-        self.stats[name] = {'wins': 0, 'total': 0}
+        self.stats[name] = collections.deque(maxlen=200)
         self.agent_pool.append(name)
             
     def update_result(self, name, agent_won):
         if name in self.stats:
-            self.stats[name]['total'] += 1
-            # "winrate cua tung snapshot": if agent won, snapshot lost.
-            if not agent_won:
-                self.stats[name]['wins'] += 1
+            self.stats[name].append(not agent_won)
                 
-            # Check for termination if in active pool
-            # Require at least 20 matches to have a statistically meaningful winrate
-            h = self.stats[name]
-            if name in self.agent_pool and h['total'] >= 20:
-                snapshot_winrate = h['wins'] / h['total']
+            history = self.stats[name]
+            if name in self.agent_pool and len(history) >= 20:
+                snapshot_winrate = sum(history) / len(history)
                 if snapshot_winrate < 0.05:
-                    log.info(f"[SelfPlay] Opponent '{name}' winrate {snapshot_winrate:.3f} < 0.05 after {h['total']} matches. Moving to terminated pool.")
+                    log.info(f"[SelfPlay] Opponent '{name}' winrate {snapshot_winrate:.3f} < 0.05 over last {len(history)} matches. Moving to terminated pool.")
                     if name in self.agent_pool:
                         self.agent_pool.remove(name)
                     self.terminated_pool.append(name)
-                    # Reset indices to avoid out of bounds
-                    self.agent_idx = 0
-                    self.terminated_idx = 0
+
+    def _refresh_exploiters(self):
+        import time
+        if not os.path.exists(self.exploiter_dir):
+            return
+        files = sorted([f for f in os.listdir(self.exploiter_dir) if f.endswith(".zip")])
+        for f in files:
+            name = f"exploiter_{f.replace('.zip', '')}"
+            if name not in self.opponents:
+                path = os.path.join(self.exploiter_dir, f)
+                log.info(f"[SelfPlay] Found new Exploiter '{name}' -> Loading...")
+                try:
+                    policy = PPO.load(path, device='cpu')
+                    self.opponents[name] = policy
+                    self.exploiter_pool.append(name)
+                except Exception as e:
+                    log.error(f"[SelfPlay] Failed to load exploiter {name}: {e}")
+
+    def sample_opponent(self, current_step=0):
+        import time
+        now = time.time()
+        if now - self.last_exploiter_refresh > 60:
+            self._refresh_exploiters()
+            self.last_exploiter_refresh = now
+            
+        r = np.random.rand()
+        has_exploiter = len(self.exploiter_pool) > 0
+        has_pfsp = len(self.agent_pool) > 0
         
-    def sample_opponent(self):
-        num_agents = len(self.agent_pool)
-        total_entities = num_agents + 1  # The +1 is the bot entity
-
-        idx = self.agent_idx % total_entities
-        self.agent_idx = (self.agent_idx + 1) % total_entities
-
-        if idx == num_agents:
-            # Bot's turn
-            r = np.random.rand()
-            if r < 0.82:
-                bot_name = 'Wanderer'
-            elif r < 0.88:
-                bot_name = 'Pazzo'
-            elif r < 0.94:
-                bot_name = 'Random'
-            else:
-                bot_name = 'Static'
+        # 10% Bot, 20% Exploiter, 70% PFSP
+        bot_prob = 0.10
+        exploiter_prob = 0.20 if has_exploiter else 0.0
+        pfsp_prob = 0.70 if has_pfsp else 0.0
+        
+        total = bot_prob + exploiter_prob + pfsp_prob
+        bot_prob /= total
+        exploiter_prob /= total
+        pfsp_prob /= total
+        
+        if r < bot_prob:
+            valid_bots = ['Pazzo', 'Random', 'Static']
+            if current_step >= 10_000_000:
+                valid_bots.append('Wanderer')
+            bot_name = np.random.choice(valid_bots)
             return None, bot_name
+        elif r < bot_prob + exploiter_prob:
+            chosen_name = np.random.choice(self.exploiter_pool)
+            return self.opponents[chosen_name], chosen_name
         else:
-            # Snapshot's turn
-            chosen_name = self.agent_pool[idx]
+            weights = []
+            for name in self.agent_pool:
+                h = self.stats.get(name, collections.deque(maxlen=200))
+                if len(h) == 0:
+                    w = 1.0
+                else:
+                    opp_winrate = sum(h) / len(h)
+                    w = max(0.05, opp_winrate) # PFSP weight = loss rate
+                weights.append(w)
+            
+            weights = np.array(weights)
+            weights /= weights.sum()
+            chosen_name = np.random.choice(self.agent_pool, p=weights)
             return self.opponents[chosen_name], chosen_name
 
 # ── Self-Play Environment Wrapper ─────────────────────────────────────────────
@@ -127,7 +162,7 @@ class SelfPlayEnv(HaxballCurriculumEnv):
         # Override opponent if it's an opponent episode
         if self.episode_type == 'opponent':
             # Sample either a snapshot opponent or one of the four bot types
-            policy, name = self.opponent_manager.sample_opponent()
+            policy, name = self.opponent_manager.sample_opponent(self.total_timesteps_elapsed)
             self.current_opponent_name = name
             if name in BOT_TYPES:
                 self.opponent_type = name
@@ -165,19 +200,13 @@ class SelfPlayCallback(BaseCallback):
         # next_snapshot_at will be recalculated in _on_training_start based on existing snapshots
         self.next_snapshot_at = 1_000_000
         self.best_reward = -np.inf
-        self.best_path = os.path.join(model_dir, "a1_best")
+        self.best_path = os.path.join(model_dir, "main_1v1_best")
         
     def _on_training_start(self) -> None:
-        # Recalculate next_snapshot_at based on snapshots already loaded (resume case)
         N = len(self.opponent_manager.agent_pool)
+        self.next_snapshot_at = (N + 1) * 1_000_000
         if N > 0:
-            # Rebuild next_snapshot_at: sum of (k+1)*1_000_000 for k=0..N-1, then next interval
-            accumulated = sum((k + 1) * 1_000_000 for k in range(N))
-            next_interval = (N + 1) * 1_000_000
-            self.next_snapshot_at = accumulated + next_interval
             log.info(f"[SelfPlay] Resume: {N} existing snapshots, next snapshot at step {self.next_snapshot_at:,}")
-        else:
-            self.next_snapshot_at = 1_000_000
         
     def _on_step(self) -> bool:
         # 1. Sync timesteps so env curriculum sees current progress
@@ -187,7 +216,7 @@ class SelfPlayCallback(BaseCallback):
         # 2. Checkpoint and register new opponent
         while self.next_snapshot_at <= self.num_timesteps:
             snapshot_name = f"snapshot_{self.num_timesteps}"
-            path = os.path.join(self.model_dir, "a1_checkpoints", f"{snapshot_name}.zip")
+            path = os.path.join(self.model_dir, "main_1v1_checkpoints", f"{snapshot_name}.zip")
             self.model.save(path)
             
             if self.verbose:
@@ -195,10 +224,7 @@ class SelfPlayCallback(BaseCallback):
             
             self.opponent_manager.add_opponent(snapshot_name, path)
             
-            # Dynamic interval: (current_number_of_snapshots + 1) * 1_000_000
-            N = len(self.opponent_manager.agent_pool)
-            interval = (N + 1) * 1_000_000
-            self.next_snapshot_at += interval
+            self.next_snapshot_at += 1_000_000
             
             # Print winrates
             log.info("\n--- SelfPlay Opponent Winrates ---")
@@ -207,9 +233,11 @@ class SelfPlayCallback(BaseCallback):
             log.info("Terminated Pool: " + ", ".join(self.opponent_manager.terminated_pool))
             log.info("Stats:")
             for name, h in self.opponent_manager.stats.items():
-                if h['total'] > 0:
-                    wr = h['wins'] / h['total']
-                    log.info(f"  {name}: {wr*100:.1f}% ({h['wins']}/{h['total']})")
+                if len(h) > 0:
+                    wins = sum(h)
+                    total = len(h)
+                    wr = wins / total
+                    log.info(f"  {name}: {wr*100:.1f}% ({wins}/{total})")
                 else:
                     log.info(f"  {name}: No matches yet")
             log.info("----------------------------------")
@@ -232,7 +260,7 @@ class SelfPlayCallback(BaseCallback):
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--a0-model", default="models/a0.1_checkpoints/a0.1_snapshot_5000000.zip", help="Path to initial A0.1 model")
+    p.add_argument("--a0-model", default=None, help="Path to initial A0.1 model (leave empty to train from scratch)")
     p.add_argument("--steps",    default=30_000_000,  type=int)
     p.add_argument("--resume",   default=None,        help="Resume from a previous checkpoint")
     return p.parse_args()
@@ -242,13 +270,13 @@ if __name__ == "__main__":
     args = parse_args()
 
     # Ensure model directories exist
-    os.makedirs("models/a1_checkpoints", exist_ok=True)
+    os.makedirs("models/main-training-1v1/main_1v1_checkpoints", exist_ok=True)
 
     # 1. Initialize Opponent Manager
     opponent_manager = OpponentManager(args.a0_model)
 
     def make_env():
-        return SelfPlayEnv(opponent_manager=opponent_manager, phase='A1')
+        return SelfPlayEnv(opponent_manager=opponent_manager, phase='MAIN_1V1')
 
     vec_env = DummyVecEnv([make_env for _ in range(N_ENVS)])
     vec_env = VecMonitor(vec_env)
@@ -258,21 +286,28 @@ if __name__ == "__main__":
         custom_objects = PPO_PARAMS.copy()
         if "policy_kwargs" in custom_objects:
             del custom_objects["policy_kwargs"]
+        custom_objects["tensorboard_log"] = "./tensorboard/main_1v1"
         model = PPO.load(args.resume, env=vec_env, custom_objects=custom_objects)
         model.set_env(vec_env)  # Ensure env is correctly wired
-    else:
+    elif args.a0_model and os.path.exists(args.a0_model):
         log.info(f"[SelfPlay] Loading pretrained A0 weights from {args.a0_model}")
         custom_objects = PPO_PARAMS.copy()
         if "policy_kwargs" in custom_objects:
             del custom_objects["policy_kwargs"]
+        custom_objects["tensorboard_log"] = "./tensorboard/main_1v1"
         model = PPO.load(args.a0_model, env=vec_env, custom_objects=custom_objects)
         model.set_env(vec_env)
+    else:
+        log.info("[SelfPlay] Starting training from scratch (no pretrained weights)")
+        params = PPO_PARAMS.copy()
+        params["tensorboard_log"] = "./tensorboard/main_1v1"
+        model = PPO("MlpPolicy", env=vec_env, verbose=1, **params)
 
     is_resume = bool(args.resume)
 
     # 2. On resume: reload existing snapshots from disk so opponent pool is intact
     if is_resume:
-        ckpt_dir = "models/a1_checkpoints"
+        ckpt_dir = "models/main-training-1v1/main_1v1_checkpoints"
         existing = sorted(
             [f for f in os.listdir(ckpt_dir) if f.startswith("snapshot_") and f.endswith(".zip")],
             key=lambda f: int(f.replace("snapshot_", "").replace(".zip", ""))
@@ -287,7 +322,7 @@ if __name__ == "__main__":
     callback = SelfPlayCallback(
         opponent_manager=opponent_manager,
         target_reward=TARGET_REWARD,
-        model_dir="models/",
+        model_dir="models/main-training-1v1/",
         envs=vec_env,
         verbose=1
     )
@@ -309,5 +344,5 @@ if __name__ == "__main__":
         progress_bar         = True,
     )
 
-    model.save("models/a1_final")
-    log.info("[SelfPlay] Done -> models/a1_final.zip")
+    model.save("models/main-training-1v1/main_1v1_final")
+    log.info("[SelfPlay] Done -> models/main-training-1v1/main_1v1_final.zip")

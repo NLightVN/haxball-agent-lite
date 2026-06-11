@@ -1,19 +1,19 @@
 """
-train_a1_pfsp.py — Self-Play Training with Prioritized Fictitious Self-Play (PFSP).
+train_a1.2.py — Self-Play Training.
 
 Episode types:
   • PRECISION : small goal (0.3–0.6×), no opponent → aim accuracy
-  • OPPONENT  : goal 1.4×→0.6× over 2M steps, opponent = Sampled from self-play pool via PFSP
+  • OPPONENT  : goal 1.4×→0.6× over 2M steps, opponent = Sampled from self-play pool
 
 Usage:
-    python training/train_a1_pfsp.py
+    python training/train_a1.2.py
 """
 
 import argparse
 import os
 import sys
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT_DIR)
 os.chdir(ROOT_DIR)
 
@@ -22,11 +22,11 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from training.env import HaxballCurriculumEnv
 from utils.model_logger import get_model_logger
 
-log = get_model_logger("a1_pfsp")
+log = get_model_logger("a1")
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 N_ENVS          = 8
@@ -47,13 +47,16 @@ PPO_PARAMS = dict(
     policy_kwargs= dict(net_arch=dict(pi=[256, 256], vf=[256, 256]))
 )
 
-# ── Self-Play Opponent Manager (PFSP) ─────────────────────────────────────────
+# ── Self-Play Opponent Manager ────────────────────────────────────────────────
 class OpponentManager:
     def __init__(self, initial_model_path):
         self.opponents = {}  # name -> policy
         self.agent_pool = []
         self.bot_pool = list(BOT_TYPES)
         self.terminated_pool = []
+        
+        self.agent_idx = 0
+        self.terminated_idx = 0
         
         # Stats per opponent: wins = snapshot's wins (agent lost)
         self.stats = {} # name -> {'wins': 0, 'total': 0}
@@ -82,13 +85,18 @@ class OpponentManager:
                     if name in self.agent_pool:
                         self.agent_pool.remove(name)
                     self.terminated_pool.append(name)
+                    # Reset indices to avoid out of bounds
+                    self.agent_idx = 0
+                    self.terminated_idx = 0
         
     def sample_opponent(self):
         num_agents = len(self.agent_pool)
         total_entities = num_agents + 1  # The +1 is the bot entity
 
-        # PFSP: Bots are played with the same base probability as before (1 / total_entities)
-        if np.random.rand() < (1.0 / total_entities):
+        idx = self.agent_idx % total_entities
+        self.agent_idx = (self.agent_idx + 1) % total_entities
+
+        if idx == num_agents:
             # Bot's turn
             r = np.random.rand()
             if r < 0.82:
@@ -101,22 +109,8 @@ class OpponentManager:
                 bot_name = 'Static'
             return None, bot_name
         else:
-            # Snapshot's turn using PFSP
-            weights = []
-            for name in self.agent_pool:
-                h = self.stats[name]
-                if h['total'] == 0:
-                    weights.append(1.0)  # Max priority for unplayed
-                else:
-                    # PFSP focuses on opponents that the agent loses to
-                    # priority = (snapshot_winrate)^2 + epsilon
-                    snapshot_wr = h['wins'] / h['total']
-                    weights.append(snapshot_wr ** 2 + 0.01)
-                    
-            weights = np.array(weights)
-            probs = weights / np.sum(weights)
-            
-            chosen_name = np.random.choice(self.agent_pool, p=probs)
+            # Snapshot's turn
+            chosen_name = self.agent_pool[idx]
             return self.opponents[chosen_name], chosen_name
 
 # ── Self-Play Environment Wrapper ─────────────────────────────────────────────
@@ -238,7 +232,7 @@ class SelfPlayCallback(BaseCallback):
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--a0-model", default="models/a0.1_checkpoints/a0.1_snapshot_3500000.zip", help="Path to initial A0.1 model")
+    p.add_argument("--a0-model", default="models/experiment/a0.1_checkpoints/a0.1_snapshot_5000000.zip", help="Path to initial A0.1 model")
     p.add_argument("--steps",    default=30_000_000,  type=int)
     p.add_argument("--resume",   default=None,        help="Resume from a previous checkpoint")
     return p.parse_args()
@@ -248,7 +242,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     # Ensure model directories exist
-    os.makedirs("models/a1_pfsp_checkpoints", exist_ok=True)
+    os.makedirs("models/experiment/a1_checkpoints", exist_ok=True)
 
     # 1. Initialize Opponent Manager
     opponent_manager = OpponentManager(args.a0_model)
@@ -278,7 +272,7 @@ if __name__ == "__main__":
 
     # 2. On resume: reload existing snapshots from disk so opponent pool is intact
     if is_resume:
-        ckpt_dir = "models/a1_pfsp_checkpoints"
+        ckpt_dir = "models/experiment/a1_checkpoints"
         existing = sorted(
             [f for f in os.listdir(ckpt_dir) if f.startswith("snapshot_") and f.endswith(".zip")],
             key=lambda f: int(f.replace("snapshot_", "").replace(".zip", ""))
@@ -293,7 +287,7 @@ if __name__ == "__main__":
     callback = SelfPlayCallback(
         opponent_manager=opponent_manager,
         target_reward=TARGET_REWARD,
-        model_dir="models/",
+        model_dir="models/experiment/",
         envs=vec_env,
         verbose=1
     )
@@ -315,5 +309,5 @@ if __name__ == "__main__":
         progress_bar         = True,
     )
 
-    model.save("models/a1_pfsp_final")
-    log.info("[SelfPlay] Done -> models/a1_pfsp_final.zip")
+    model.save("models/experiment/a1_final")
+    log.info("[SelfPlay] Done -> models/experiment/a1_final.zip")

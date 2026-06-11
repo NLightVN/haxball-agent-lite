@@ -2,9 +2,9 @@
 eval.py — Evaluate a trained A0 (or A1) model.
 
 Usage:
-    python eval.py --model models/a0_best.zip
-    python eval.py --model models/a0_best.zip --render --delay 0.05
-    python eval.py --model models/a0_best.zip --render --goal-scale 0.5
+    python eval.py --model models/experiment/a0_best.zip
+    python eval.py --model models/experiment/a0_best.zip --render --delay 0.05
+    python eval.py --model models/experiment/a0_best.zip --render --goal-scale 0.5
 """
 
 import argparse

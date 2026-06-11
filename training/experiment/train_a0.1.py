@@ -10,7 +10,7 @@ import argparse
 import os
 import sys
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ROOT_DIR)
 os.chdir(ROOT_DIR)
 
@@ -19,7 +19,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from stable_baselines3.common.callbacks import BaseCallback
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from training.env import HaxballCurriculumEnv
 from utils.model_logger import get_model_logger
 
@@ -150,7 +150,7 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
 
-    os.makedirs("models/a0.1_checkpoints", exist_ok=True)
+    os.makedirs("models/experiment/a0.1_checkpoints", exist_ok=True)
 
     def make_env():
         return HaxballCurriculumEnv(phase='A0.1', n_agents=1)
@@ -170,7 +170,7 @@ if __name__ == "__main__":
         model = PPO("MlpPolicy", vec_env, verbose=1, device="auto", **PPO_PARAMS)
 
     callback = A01Callback(
-        model_dir="models/",
+        model_dir="models/experiment/",
         envs=vec_env,
         save_freq=CHECKPOINT_FREQ,
         verbose=1
@@ -189,5 +189,5 @@ if __name__ == "__main__":
         progress_bar         = True,
     )
 
-    model.save("models/a0.1_final")
-    log.info("[A0.1] Done -> models/a0.1_final.zip")
+    model.save("models/experiment/a0.1_final")
+    log.info("[A0.1] Done -> models/experiment/a0.1_final.zip")

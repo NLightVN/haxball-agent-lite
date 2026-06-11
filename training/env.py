@@ -163,7 +163,7 @@ class HaxballCurriculumEnv(gym.Env):
         self.legacy_obs = legacy_obs
         self._rng = np.random.default_rng(seed)
         
-        self.frame_skip = 3 if self.phase in ('A1.2', 'A0.1', 'A1') else FRAME_SKIP
+        self.frame_skip = 3 if self.phase in ('A1.2', 'A0.1', 'A1', 'MAIN_1V1') else FRAME_SKIP
 
         # Gymnasium spaces
         self.obs_dim = 100 if self.legacy_obs else OBS_DIM
@@ -256,6 +256,7 @@ class HaxballCurriculumEnv(gym.Env):
         self._a0_1_best_ball_dist_to_goal = self._prev_ball_dist_to_goal
         self._a0_1_steps_since_ball_record = 0
         self._a0_1_record_ball_to_goal_reward_total = 0.0
+        self._main_1v1_dense_reward_total = 0.0
 
         return self._get_obs(), {}
 
@@ -343,7 +344,7 @@ class HaxballCurriculumEnv(gym.Env):
                 self.goal_y = 64.0
                 # team_id / _flip / _attack_sign already randomized in reset()
                 
-            elif self.phase == 'A1':
+            elif self.phase in ('A1', 'MAIN_1V1'):
                 # Self-Play phase: map always 1v1, goal always 64
                 self.episode_type = 'opponent'
                 self.goal_y = 64.0
@@ -421,12 +422,17 @@ class HaxballCurriculumEnv(gym.Env):
                     pos2 = self._safe_spawn(x_min=opp_x_min, x_max=opp_x_max)
                     self.agents.append(Disc(pos2[0], pos2[1], 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
 
-                elif self.phase == 'A1.2':
+                elif self.phase in ('A1.2', 'MAIN_1V1'):
                     # Randomize players in their respective halves
                     red_x = float(self._rng.uniform(-self.HW + PLYR_R, 0 - PLYR_R))
-                    red_y = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
                     blue_x = float(self._rng.uniform(0 + PLYR_R, self.HW - PLYR_R))
-                    blue_y = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
+                    
+                    if self.phase == 'MAIN_1V1':
+                        red_y = float(self._rng.uniform(-self.goal_y, self.goal_y))
+                        blue_y = float(self._rng.uniform(-self.goal_y, self.goal_y))
+                    else:
+                        red_y = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
+                        blue_y = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
 
                     if self.team_id == 1:
                         self.agents.append(Disc(red_x, red_y, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Agent (RED)
@@ -513,7 +519,7 @@ class HaxballCurriculumEnv(gym.Env):
         agent_actions = [(dx * self._flip, dy, kick)]
         
         # In A1/A1.2/A0.1, we have an opponent. Determine their action.
-        if self.phase in ('A1', 'A1.2', 'A0.1') and len(self.agents) > 1:
+        if self.phase in ('A1', 'A1.2', 'A0.1', 'MAIN_1V1') and len(self.agents) > 1:
             if self.opponent_type == 'Defender':
                 agent_actions.append(self._get_defender_action())
             elif self.opponent_type == 'Attacker':
@@ -608,19 +614,29 @@ class HaxballCurriculumEnv(gym.Env):
             if goal_result == 2:
                 # Agent scored
                 self.scores[self.team_id - 1] += 1
-                reward += 30.0
+                if self.phase == 'MAIN_1V1':
+                    reward += 5.0 + (self.max_steps - self.step_count) * 0.0016
+                else:
+                    reward += 30.0
                 goal_scored = True
                 self._reset_positions()
             elif goal_result == 1:
                 # Opponent scored
                 opp_id = 2 if self.team_id == 1 else 1
                 self.scores[opp_id - 1] += 1
-                reward -= 10.0
+                if self.phase == 'MAIN_1V1':
+                    reward += -5.0 - max(self._main_1v1_dense_reward_total, 0.0)
+                else:
+                    reward -= 10.0
                 goal_scored = True
                 self._reset_positions()
 
-            # Penalty/Reward logic for A1.2
-            if self.phase == 'A1.2' and not goal_scored:
+            # Penalty/Reward logic for A1.2 / MAIN_1V1
+            if self.phase == 'MAIN_1V1' and not goal_scored:
+                if self.last_touch == 'A':
+                    reward += 0.0015
+                    self._main_1v1_dense_reward_total += 0.0015
+            elif self.phase == 'A1.2' and not goal_scored:
                 # Dense reward for ball advancing toward goal
                 cur_ball_dist_to_goal = _dist_to_goal_segment(
                     self.ball.x, self.ball.y,
@@ -688,6 +704,10 @@ class HaxballCurriculumEnv(gym.Env):
         agents = self.agents
         HW, HH = self.HW, self.HH
 
+        # Track touches in this tick (from kicks or collisions)
+        touched_agent = False
+        touched_opp = False
+
         # Randomize agent action order each tick to prevent systematic first-mover advantage
         action_order = list(range(len(agent_actions)))
         self._rng.shuffle(action_order)
@@ -704,6 +724,11 @@ class HaxballCurriculumEnv(gym.Env):
                     nx, ny = dx_b / dist, dy_b / dist
                     ball.xs += nx * KICK_STR
                     ball.ys += ny * KICK_STR
+                    
+                    if ag is self.agents[0]:
+                        touched_agent = True
+                    elif len(self.agents) > 1 and ag is self.agents[1]:
+                        touched_opp = True
 
         # 2. Acceleration — random order
         for i in action_order:
@@ -728,20 +753,16 @@ class HaxballCurriculumEnv(gym.Env):
         all_discs = [ball] + shuffled_agents
         n = len(all_discs)
         
-        # Track touches in this tick
-        touched_agent = False
-        touched_opp = False
-        
         for i in range(n):
             for j in range(i + 1, n):
                 collided = _resolve_dd(all_discs[i], all_discs[j])
                 if collided:
                     # Check if player hit the ball
-                    if (i == 0 and j > 0) or (j == 0 and i > 0):
-                        idx = max(i, j) - 1 # 0 for agent, 1 for opponent
-                        if idx == 0:
+                    if i == 0: # all_discs[0] is the ball
+                        hit_agent = all_discs[j]
+                        if hit_agent is self.agents[0]:
                             touched_agent = True
-                        elif idx == 1:
+                        elif len(self.agents) > 1 and hit_agent is self.agents[1]:
                             touched_opp = True
 
         if touched_agent and touched_opp:

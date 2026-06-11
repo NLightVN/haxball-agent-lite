@@ -2,9 +2,9 @@
 eval_render.py — Visual evaluation: watch a trained A1 model play against A0 / bots.
 
 Usage:
-    python eval_render.py --a1-model models/a1_best --a0-model models/a0_final
-    python eval_render.py --a1-model models/a1_best --a0-model models/a0_final --opponent Defender
-    python eval_render.py --a1-model models/a1_best --opponent human   # YOU control the opponent!
+    python eval_render.py --a1-model models/experiment/a1_best --a0-model models/experiment/a0_final
+    python eval_render.py --a1-model models/experiment/a1_best --a0-model models/experiment/a0_final --opponent Defender
+    python eval_render.py --a1-model models/experiment/a1_best --opponent human   # YOU control the opponent!
 
 Controls (while window is open):
     SPACE   — pause / resume
@@ -27,7 +27,7 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH = "models/a1_final.zip"   # Path to A1 model .zip
+A1_MODEL_PATH = "models/experiment/a1_final.zip"   # Path to A1 model .zip
 A0_MODEL_PATH = None                    # Path to A0 model .zip (used as opponent if Opponent is Trained)
 OPPONENT = "Defender"                   # Defender | Attacker | Hybrid | Follower | Trained | random | human
 GOAL_SIZE = 65.0                        # Goal half-height in physics units

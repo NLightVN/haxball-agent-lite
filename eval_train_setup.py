@@ -7,7 +7,7 @@ from training.train_a1 import OpponentManager, SelfPlayEnv
 import numpy as np
 
 def run():
-    model_path = "models/a1_checkpoints/snapshot_1000000.zip"
+    model_path = "models/experiment/a1_checkpoints/snapshot_1000000.zip"
     
     opponent_manager = OpponentManager(None)
     opponent_manager.add_opponent("snapshot_1000000", model_path)

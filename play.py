@@ -23,8 +23,8 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH      = "models/a1_final.zip"  # Agent chính
-OPPONENT_MODEL_PATH = "models/a1_checkpoints/snapshot_1000000.zip" # Opponent model (dùng khi OPPONENT='Trained')
+A1_MODEL_PATH      = "models/main-training-1v1/main_1v1_checkpoints/snapshot_1000000.zip"  # Agent chính
+OPPONENT_MODEL_PATH = "models/experiment/a1_checkpoints/snapshot_28000000.zip" # Opponent model (dùng khi OPPONENT='Trained')
 A0_MODEL_PATH = None
 OPPONENT = "Human"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
 GOAL_SIZE = 64.0                        # Goal half-height in physics units
@@ -288,7 +288,7 @@ def main():
     # Field surface rect (below panel, with 5px margin)
     field_rect = pygame.Rect(5, PANEL_H + 5, WIN_W - 10, FIELD_H)
 
-    env = HaxballCurriculumEnv(phase="A1")
+    env = HaxballCurriculumEnv(phase="MAIN_1V1")
     if A0_MODEL_PATH:
         env.a0_model_path = A0_MODEL_PATH
 

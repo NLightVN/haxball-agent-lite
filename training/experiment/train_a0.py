@@ -1,13 +1,13 @@
 """
 Train A0 only — 1 agent, no opponent, score into right goal.
-- Checkpoints every 50,000 steps → models/a0_checkpoints/
+- Checkpoints every 50,000 steps → models/experiment/a0_checkpoints/
 - Auto-stop when rollout/ep_rew_mean >= 3.0 (consistently scoring)
-- Saves best model to models/a0_best.zip
+- Saves best model to models/experiment/a0_best.zip
 """
 
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
@@ -71,7 +71,7 @@ class A0MonitorCallback(BaseCallback):
 
 
 if __name__ == "__main__":
-    os.makedirs("models/a0_checkpoints", exist_ok=True)
+    os.makedirs("models/experiment/a0_checkpoints", exist_ok=True)
 
     # Create N_ENVS parallel A0 environments
     vec_env = DummyVecEnv([lambda: HaxballCurriculumEnv(phase='A0') for _ in range(N_ENVS)])
@@ -88,19 +88,19 @@ if __name__ == "__main__":
     # Checkpoint every CHECKPOINT_FREQ steps (adjusted for N_ENVS)
     checkpoint_cb = CheckpointCallback(
         save_freq = max(CHECKPOINT_FREQ // N_ENVS, 1),
-        save_path = "models/a0_checkpoints/",
+        save_path = "models/experiment/a0_checkpoints/",
         name_prefix = "a0",
         verbose = 1,
     )
 
     monitor_cb = A0MonitorCallback(
         target_reward = TARGET_REWARD,
-        model_dir     = "models/",
+        model_dir     = "models/experiment/",
         verbose       = 1,
     )
 
     log.info(f"[A0] Starting training — {N_ENVS} envs, up to {TOTAL_STEPS:,} steps")
-    log.info(f"[A0] Checkpoints: models/a0_checkpoints/  |  Best: models/a0_best.zip")
+    log.info(f"[A0] Checkpoints: models/experiment/a0_checkpoints/  |  Best: models/experiment/a0_best.zip")
     log.info(f"[A0] Tensorboard: tensorboard/a0/")
 
     model.learn(
@@ -110,6 +110,6 @@ if __name__ == "__main__":
     )
 
     # Final save (if not early-stopped)
-    final_path = "models/a0_final"
+    final_path = "models/experiment/a0_final"
     model.save(final_path)
     log.info(f"[A0] Training complete. Final model: {final_path}.zip")
