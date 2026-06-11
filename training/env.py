@@ -224,7 +224,7 @@ class HaxballCurriculumEnv(gym.Env):
         elif self.phase == 'A0.1':
             ep_secs = 30 # 30 seconds
         else:
-            ep_secs = 90 # 1.5 minutes
+            ep_secs = 45 # 45 seconds (900 steps)
         
         self.max_steps = ep_secs * PHYSICS_HZ // self.frame_skip
         self.step_count = 0
@@ -589,7 +589,7 @@ class HaxballCurriculumEnv(gym.Env):
         
         if cur_ball_spd < 0.1:
             self._ball_slow_steps += 1
-            if self._ball_slow_steps >= 40:  # 40 steps = 2 seconds at 20 steps/sec
+            if self._ball_slow_steps >= 20:  # 20 steps = 1 second at 20 steps/sec
                 self.last_touch = None
         else:
             self._ball_slow_steps = 0
@@ -643,8 +643,8 @@ class HaxballCurriculumEnv(gym.Env):
             # Penalty/Reward logic for A1.2 / MAIN_1V1
             if self.phase == 'MAIN_1V1' and not goal_scored:
                 if self.last_touch == 'A':
-                    reward += 0.0005
-                    self._main_1v1_dense_reward_total += 0.0005
+                    reward += 0.0015
+                    self._main_1v1_dense_reward_total += 0.0015
             elif self.phase == 'A1.2' and not goal_scored:
                 # Dense reward for ball advancing toward goal
                 cur_ball_dist_to_goal = _dist_to_goal_segment(
