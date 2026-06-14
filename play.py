@@ -23,7 +23,7 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH      = "models/a1_final.zip"  # Agent chính
+A1_MODEL_PATH      = "models/single_agent/a1_checkpoints/snapshot_21000000.zip"  # Agent chính
 OPPONENT_MODEL_PATH = "models/a1_checkpoints/snapshot_1000000.zip" # Opponent model (dùng khi OPPONENT='Trained')
 A0_MODEL_PATH = None
 OPPONENT = "Human"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human

@@ -1,17 +1,13 @@
 """
-eval_render.py — Visual evaluation: watch a trained A1 model play against A0 / bots.
-
-Usage:
-    python eval_render.py --a1-model models/a1_best --a0-model models/a0_final
-    python eval_render.py --a1-model models/a1_best --a0-model models/a0_final --opponent Defender
-    python eval_render.py --a1-model models/a1_best --opponent human   # YOU control the opponent!
+play_multi.py — Interactive Play for Multi-Agent
+Watch or play against the AI in a pure Python environment.
 
 Controls (while window is open):
     SPACE   — pause / resume
     R       — restart episode immediately
     Q / ESC — quit
 
-Human opponent controls (--opponent human):
+Human opponent controls (OPPONENT="Human"):
     Arrow keys      — move
     Enter / RCtrl   — kick
 """
@@ -27,11 +23,17 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH = "models/a1_final.zip"   # Path to A1 model .zip
-A0_MODEL_PATH = None                    # Path to A0 model .zip (used as opponent if Opponent is Trained)
-OPPONENT = "Defender"                   # Defender | Attacker | Hybrid | Follower | Trained | random | human
-GOAL_SIZE = 65.0                        # Goal half-height in physics units
+A1_MODEL_PATH      = "models/multi_agent/rllib_checkpoints/migrated_a1_21000000"  # Agent chính (Multi-agent model)
+OPPONENT_MODEL_PATH = None # Opponent model (dùng khi OPPONENT='Trained')
+A0_MODEL_PATH = None
+OPPONENT = "Human"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
+GOAL_SIZE = 64.0                        # Goal half-height in physics units
 DETERMINISTIC = True                    # Use deterministic policy actions
+
+# Display labels (auto-derived from model paths)
+_stem = lambda p: os.path.splitext(os.path.basename(p))[0] if p else None
+AGENT_LABEL = _stem(A1_MODEL_PATH)   or "A1"
+OPP_LABEL   = _stem(OPPONENT_MODEL_PATH) or "OPP"
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
@@ -41,7 +43,20 @@ except ModuleNotFoundError:
     sys.exit(1)
 
 from stable_baselines3 import PPO
-from training.env import HaxballCurriculumEnv, DIR_MAP, KICK_STR, POLE_R
+from training.multi_agent.env_multi import HaxballMultiAgentEnv, DIR_MAP, KICK_STR, POLE_R, _dist_to_goal_segment, Disc
+
+class RLlibPolicyWrapper:
+    def __init__(self, path):
+        import ray
+        from ray.rllib.policy.policy import Policy
+        if not ray.is_initialized():
+            ray.init(ignore_reinit_error=True)
+        policy_path = os.path.join(path, "policies", "default_policy")
+        self.policy = Policy.from_checkpoint(policy_path)
+        
+    def predict(self, obs, deterministic=False):
+        action, state, info = self.policy.compute_single_action(obs, explore=not deterministic)
+        return action, state
 
 # ── Display constants ──────────────────────────────────────────────────────────
 WIN_W      = 1000
@@ -155,13 +170,18 @@ def draw_players(screen, env, surf_rect):
         sx, sy = field_to_screen(ag.x, ag.y, env, surf_rect)
         r = max(px_scale(ag.radius, env, surf_rect), 6)
 
+        # Agent: determine colour by team
+        color = C_AGENT if ag.team == 1 else C_OPP
+        
+        # Determine label based on player index
         if i == 0:
-            # Agent: determine colour by team
-            color = C_AGENT if env.team_id == 1 else C_OPP
-            label = "A1"
+            label = AGENT_LABEL
+        elif i == 1:
+            label = OPP_LABEL if env.opponent_type == 'Trained' else (env.opponent_type[:3] if env.opponent_type else "BOT")
+        elif ag.team == 1:
+            label = "TM"
         else:
-            color = C_OPP if env.team_id == 1 else C_AGENT
-            label = env.opponent_type[:3] if env.opponent_type else "BOT"
+            label = "OPP2"
 
         # Shadow
         shadow_surf = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
@@ -211,7 +231,7 @@ def draw_ball(screen, env, surf_rect):
         pygame.draw.line(screen, (*C_BALL, 60), (sx, sy), (tx, ty), max(1, r // 2))
 
 
-def draw_panel(screen, env, step, ep_reward, episode, total_eps,
+def draw_panel(screen, env, step, ep_reward, step_reward, episode, total_eps,
                result_str, paused, opp_type):
     panel_rect = pygame.Rect(0, 0, WIN_W, PANEL_H)
     pygame.draw.rect(screen, C_PANEL, panel_rect)
@@ -245,6 +265,12 @@ def draw_panel(screen, env, step, ep_reward, episode, total_eps,
         surf = FONT_SM.render(line, True, C_DIM)
         screen.blit(surf, (WIN_W - surf.get_width() - 14, 8 + i * 18))
 
+    # Step reward bar (center-bottom of panel)
+    rew_color = C_WIN if step_reward > 0.0001 else (C_LOSE if step_reward < -0.0001 else C_DIM)
+    rew_str = f"Step rew: {step_reward:+.5f}"
+    rew_surf = FONT_SM.render(rew_str, True, rew_color)
+    screen.blit(rew_surf, (WIN_W // 2 - rew_surf.get_width() // 2, PANEL_H - 44))
+
     # Result flash
     if result_str:
         color = C_WIN if "WIN" in result_str or "GOAL" in result_str else C_LOSE
@@ -266,21 +292,97 @@ def draw_panel(screen, env, step, ep_reward, episode, total_eps,
     screen.blit(controls, (WIN_W - controls.get_width() - 10, WIN_H - 18))
 
 
+def draw_features(screen, obs, env):
+    """Draw Multi-Agent new features extracted from the observation array."""
+    if obs is None:
+        return
+    
+    # In Multi-Agent observation space:
+    # obs[3] = rank (0 for nearest in team, 1 for next...)
+    # obs[4] = is_nearest_to_ball (1.0 if nearest among all players, else 0.0)
+    rank = obs[3]
+    is_nearest = obs[4]
+    
+    # Get possession
+    poss = env.possession_team
+    if poss == 1:
+        poss_str = "RED"
+        poss_color = (255, 80, 80)
+    elif poss == 2:
+        poss_str = "BLUE"
+        poss_color = (80, 130, 255)
+    else:
+        poss_str = "NONE"
+        poss_color = (200, 200, 200)
+    
+    lines = [
+        (f"[MULTI-AGENT OBS]", (255, 230, 80)),
+        (f"Rank in Team: {rank:.0f}", (200, 220, 255)),
+        (f"Nearest on Field: {'YES' if is_nearest > 0.5 else 'NO'}", (80, 255, 80) if is_nearest > 0.5 else (200, 220, 255)),
+        (f"Possession: {poss_str}", poss_color)
+    ]
+    
+    # Draw in the top left of the field
+    for i, (line, color) in enumerate(lines):
+        surf = FONT_MED.render(line, True, color)
+        # Draw with a slight shadow
+        shadow = FONT_MED.render(line, True, (0, 0, 0))
+        x_pos, y_pos = 14, PANEL_H + 14 + i * 26
+        screen.blit(shadow, (x_pos + 1, y_pos + 1))
+        screen.blit(surf, (x_pos, y_pos))
+
+
+def get_obs_for_agent(env, agent_index):
+    """Get observation from the perspective of an arbitrary agent index."""
+    if agent_index == 0:
+        return env._get_obs()
+    
+    # Swap ego agent with target agent
+    env.agents[0], env.agents[agent_index] = env.agents[agent_index], env.agents[0]
+    
+    orig_team = env.team_id
+    orig_flip = env._flip
+    orig_attack = env._attack_sign
+    
+    # Setup context for target agent
+    env.team_id = env.agents[0].team
+    env._flip = 1.0 if env.team_id == 1 else -1.0
+    env._attack_sign = 1 if env.team_id == 1 else -1
+    
+    obs = env._get_obs()
+    
+    # Swap back
+    env.agents[0], env.agents[agent_index] = env.agents[agent_index], env.agents[0]
+    env.team_id = orig_team
+    env._flip = orig_flip
+    env._attack_sign = orig_attack
+    
+    return obs
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
-    print(f"Loading A1 model: {A1_MODEL_PATH}")
-    a1_model = PPO.load(A1_MODEL_PATH, device="cpu")
+    print(f"Loading model: {A1_MODEL_PATH}")
+    try:
+        if "rllib_checkpoints" in A1_MODEL_PATH:
+            a1_model = RLlibPolicyWrapper(A1_MODEL_PATH)
+        else:
+            a1_model = PPO.load(A1_MODEL_PATH, device="cpu")
+    except Exception as e:
+        print(f"Warning: Could not load A1 model ({A1_MODEL_PATH}). Error: {e}")
+        print("Falling back to random actions. You need to train the multi-agent model first.")
+        a1_model = None
 
     pygame.init()
     screen = pygame.display.set_mode((WIN_W, WIN_H))
-    pygame.display.set_caption("Haxball — A1 Eval")
+    pygame.display.set_caption("Haxball Multi-Agent Play (2v2)")
     clock = pygame.time.Clock()
     init_fonts()
 
     # Field surface rect (below panel, with 5px margin)
     field_rect = pygame.Rect(5, PANEL_H + 5, WIN_W - 10, FIELD_H)
 
-    env = HaxballCurriculumEnv(phase="A1")
+    env = HaxballMultiAgentEnv(phase="A1")
     if A0_MODEL_PATH:
         env.a0_model_path = A0_MODEL_PATH
 
@@ -291,6 +393,20 @@ def main():
             env.forced_opponent_type = "Human"
         elif opp_lower not in ("random", "none", "solo"):
             env.forced_opponent_type = OPPONENT
+
+    # ── Load opponent policy if Trained ──────────────────────────────────────
+    if OPPONENT.lower() == "trained" and OPPONENT_MODEL_PATH:
+        print(f"Loading opponent model: {OPPONENT_MODEL_PATH}")
+        try:
+            if "rllib_checkpoints" in OPPONENT_MODEL_PATH:
+                opp_model = RLlibPolicyWrapper(OPPONENT_MODEL_PATH)
+            else:
+                opp_model = PPO.load(OPPONENT_MODEL_PATH, device="cpu")
+        except Exception as e:
+            print(f"Warning: Could not load opponent model ({OPPONENT_MODEL_PATH}). Error: {e}")
+            opp_model = None
+    else:
+        opp_model = a1_model
 
     is_human_opp = OPPONENT and OPPONENT.lower() == "human"
 
@@ -307,14 +423,51 @@ def main():
         return (float(dx), float(dy), kick)
 
     def do_reset():
-        obs, _ = env.reset()
-        env.goal_y = GOAL_SIZE   # override curriculum goal size
-        return obs
+        env.reset()
+        env.team_id      = 1
+        env._flip        = +1.0
+        env._attack_sign = +1
+        
+        # Override map params based on user HBS
+        env.HW = 550.0
+        env.HH = 240.0
+        env.goal_y = 80.0
+        env.ball.radius = 6.25
+        env.ball.bcoef = 0.4
+        
+        # Override physics configs
+        PLYR_R = 15.0
+        PLYR_IMASS = 0.5
+        PLYR_BCOEF = 0.0
+        PLYR_DAMP = 0.96
+        
+        # Create 2v2 arrangement
+        env.agents = []
+        env.agents.append(Disc(-250, 0, 0, 0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=1))    # P1
+        env.agents.append(Disc(250, 0, 0, 0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=2))     # P2 (Opp)
+        env.agents.append(Disc(-150, 100, 0, 0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=1))  # P3 (Teammate)
+        env.agents.append(Disc(150, -100, 0, 0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=2))  # P4 (Opp Teammate)
+        
+        # Reset trackers
+        import math as _math
+        a = env.agents[0]
+        env._prev_dist_to_ball = _math.hypot(a.x - env.ball.x, a.y - env.ball.y)
+        env._min_dist_to_ball = env._prev_dist_to_ball
+        goal_x = env.HW * env._attack_sign
+        env._prev_ball_dist_to_goal = _dist_to_goal_segment(
+            env.ball.x, env.ball.y,
+            goal_x, env.goal_y, 0.9 * env.goal_y
+        )
+        env._prev_ball_speed = _math.hypot(env.ball.xs, env.ball.ys)
+        env.last_touch = None
+        env.step_count = 0
+        env.scores = [0, 0]
+        return env._get_obs()
 
     # ── Physics timing ────────────────────────────────────────────────────────
-    # Each env.step() = FRAME_SKIP=6 ticks @ 60Hz → 100ms per step = 10 steps/s
+    # Each env.step() = frame_skip=3 ticks @ 60Hz → 50ms per step = 20 steps/s
     RENDER_FPS    = 60
-    STEP_INTERVAL = 1.0 / 10.0   # 100 ms → real HaxBall speed
+    STEP_INTERVAL = 1.0 / 20.0   # 20 steps/s  (3 ticks × 60Hz = correct real-time)
 
     paused          = False
     running         = True
@@ -324,9 +477,10 @@ def main():
     post_done_until = 0.0        # wait this long before resetting after match ends
     waiting_reset   = False
 
-    obs       = do_reset()
-    ep_reward = 0.0
-    step_cnt  = 0
+    obs        = do_reset()
+    ep_reward  = 0.0
+    step_reward = 0.0
+    step_cnt   = 0
     last_step_t = time.time()
 
     while running:
@@ -344,6 +498,7 @@ def main():
                 elif event.key == pygame.K_r:
                     obs           = do_reset()
                     ep_reward     = 0.0
+                    step_reward   = 0.0
                     step_cnt      = 0
                     result_flash  = ""
                     flash_until   = 0.0
@@ -358,6 +513,7 @@ def main():
             if now >= post_done_until:
                 obs           = do_reset()
                 ep_reward     = 0.0
+                step_reward   = 0.0
                 step_cnt      = 0
                 result_flash  = ""
                 flash_until   = 0.0
@@ -369,8 +525,9 @@ def main():
             draw_field(screen, env, field_rect)
             draw_players(screen, env, field_rect)
             draw_ball(screen, env, field_rect)
-            draw_panel(screen, env, step_cnt, ep_reward, episode, episode + 1,
+            draw_panel(screen, env, step_cnt, ep_reward, step_reward, episode, episode + 1,
                        result_flash, False, env.opponent_type)
+            draw_features(screen, obs, env)
             pygame.display.flip()
             clock.tick(RENDER_FPS)
             continue
@@ -380,34 +537,61 @@ def main():
             draw_field(screen, env, field_rect)
             draw_players(screen, env, field_rect)
             draw_ball(screen, env, field_rect)
-            draw_panel(screen, env, step_cnt, ep_reward, episode, episode + 1,
+            draw_panel(screen, env, step_cnt, ep_reward, step_reward, episode, episode + 1,
                        result_flash if now < flash_until else "", True, env.opponent_type)
+            draw_features(screen, obs, env)
             pygame.display.flip()
             clock.tick(RENDER_FPS)
             continue
 
         # ── Physics step (time-gated to 10 Hz = real HaxBall speed) ─────────
         if now - last_step_t >= STEP_INTERVAL:
-            if is_human_opp:
-                env.human_opponent_action = get_human_action()
-            action, _ = a1_model.predict(obs, deterministic=DETERMINISTIC)
-            obs, reward, terminated, truncated, _ = env.step(action)
-            ep_reward += reward
-            step_cnt  += 1
+            # Custom 2v2 loop running prediction for all agents
+            goal_result = 0
+            for _ in range(env.frame_skip):
+                agent_actions = []
+                for i, ag in enumerate(env.agents):
+                    obs_i = get_obs_for_agent(env, i)
+                    
+                    if i == 1 and is_human_opp:
+                        action = get_human_action()
+                        dx, dy, kick = action
+                        # Human action is already absolute, no need to flip it here
+                        agent_actions.append((dx, dy, kick))
+                        continue
+                        
+                    model_to_use = a1_model if ag.team == 1 else opp_model
+                    
+                    if model_to_use is not None:
+                        action, _ = model_to_use.predict(obs_i, deterministic=DETERMINISTIC)
+                        dx, dy = DIR_MAP[int(action[0])]
+                        kick = int(action[1])
+                    else:
+                        dx, dy = DIR_MAP[np.random.randint(0, 9)]
+                        kick = np.random.randint(0, 2)
+                        
+                    flip_ag = 1.0 if ag.team == 1 else -1.0
+                    agent_actions.append((dx * flip_ag, dy, kick))
+                    
+                res = env._tick(agent_actions)
+                if res != 0:
+                    goal_result = res
+            
+            # Post tick updates
+            obs = get_obs_for_agent(env, 0)
+            env.step_count += 1
+            step_cnt += 1
             last_step_t = now
 
+            terminated = (goal_result != 0)
+            truncated = (env.step_count >= env.max_steps)
             done = terminated or truncated
+            
             if done:
                 if terminated:
-                    agent_score = env.scores[env.team_id - 1]
-                    opp_id      = 2 if env.team_id == 1 else 1
-                    opp_score   = env.scores[opp_id - 1]
-                    if agent_score >= 3:
-                        result_flash = f"WIN!  {agent_score} - {opp_score}"
-                    else:
-                        result_flash = f"LOSS  {agent_score} - {opp_score}"
+                    result_flash = f"GOAL!  (Team {goal_result})"
                 else:
-                    result_flash = f"TIMEOUT  {env.scores[0]}-{env.scores[1]}"
+                    result_flash = f"TIMEOUT"
                 flash_until     = now + 10.0   # show flash until reset
                 post_done_until = now + 2.0    # auto-reset after 2 s
                 waiting_reset   = True
@@ -417,8 +601,9 @@ def main():
         draw_field(screen, env, field_rect)
         draw_players(screen, env, field_rect)
         draw_ball(screen, env, field_rect)
-        draw_panel(screen, env, step_cnt, ep_reward, episode, episode + 1,
+        draw_panel(screen, env, step_cnt, ep_reward, step_reward, episode, episode + 1,
                    result_flash if now < flash_until else "", paused, env.opponent_type)
+        draw_features(screen, obs, env)
         pygame.display.flip()
         clock.tick(RENDER_FPS)
 
