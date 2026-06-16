@@ -26,7 +26,7 @@ window.PPOBot = (() => {
         Input.LEFT | Input.DOWN,             // 8: down-left
     ];
 
-    const FRAME_SKIP = 6;   // decision every 6 physics ticks (matches training)
+    const FRAME_SKIP = 3;   // decision every 3 physics ticks (matches training)
     const OBS_DIM = 106;
     const N_DIR = 9;
     const N_KICK = 2;

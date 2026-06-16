@@ -32,18 +32,15 @@ class A1CurriculumCallbacks(DefaultCallbacks):
         global_step = worker.global_vars.get("global_step", 0)
         env = base_env.get_sub_environments()[env_index]
         
-        # 50/50 map selection
-        env.map_type = "small" if np.random.rand() < 0.5 else "large"
+        # Always use small map for 1v1
+        env.map_type = "small"
         
-        # Curriculum Logic
+        # Still use basic bots 50% of the time during warmup
         if global_step < 500_000:
-            if env.map_type == "large":
-                env.bot_mode = True
+            env.bot_mode = np.random.rand() < 0.5
+            if env.bot_mode:
                 env.bot_type = np.random.choice(["Static", "Random", "Wanderer", "Pazzo"])
-            else:
-                env.bot_mode = False
         else:
-            # Self play on both maps
             env.bot_mode = False
 
     def on_train_result(self, *, algorithm, result, **kwargs):
@@ -56,12 +53,35 @@ class A1CurriculumCallbacks(DefaultCallbacks):
             })
         )
 
+    def on_postprocess_trajectory(
+        self,
+        *,
+        worker,
+        episode,
+        agent_id,
+        policy_id,
+        policies,
+        postprocessed_batch,
+        original_batches,
+        **kwargs,
+    ):
+        from ray.rllib.policy.sample_batch import SampleBatch
+        if "infos" in postprocessed_batch:
+            infos = postprocessed_batch["infos"]
+            for t, info in enumerate(infos):
+                if isinstance(info, dict) and "investment_credit" in info:
+                    credits = info["investment_credit"]
+                    if credits is not None:
+                        for steps_ago, amount in credits:
+                            target_t = t - steps_ago
+                            if 0 <= target_t < len(postprocessed_batch[SampleBatch.REWARDS]):
+                                postprocessed_batch[SampleBatch.REWARDS][target_t] += float(amount)
+
 def policy_mapping_fn(agent_id, episode, worker, **kwargs):
     if agent_id == "red_0":
         return "learning_agent"
     else:
-        global_step = worker.global_vars.get("global_step", 0)
-        if global_step < 500_000:
+        if np.random.rand() < 0.5:
             return "old_a1"
         else:
             # Randomly select a snapshot or the current learning agent

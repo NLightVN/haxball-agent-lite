@@ -54,7 +54,7 @@ class HaxballRLlibEnv(MultiAgentEnv):
         self.scores = [0, 0] # RED, BLUE
         
         # Dense reward tracking (per agent)
-        self._prev_dist_to_goal = {} # ball to opponent goal from agent's perspective
+        self._prev_dist_to_goal = {} # kept for potential future use
         
         # Possession & Investment
         self.tick_count = 0
@@ -63,10 +63,20 @@ class HaxballRLlibEnv(MultiAgentEnv):
         self.tentative_start_tick = 0
         self.tentative_last_tick = 0
         
-        self._inv_pool = {} # {agent_id: credit}
-        self._inv_events = {ag_id: [] for ag_id in self.agent_ids} # {agent_id: [(step, credit)]}
+        # Investment: ordered chain [(ag_id, ratio, step_when_entered)]
+        # Latest entry always has ratio 1.0; each prior entry is halved on every new touch.
+        self._inv_chain: list = []
         self._inv_last_toucher = None
         self._inv_step = 0
+
+        self.global_timesteps = 0
+        self.match_mode = "2v2"
+        self.active_agent_ids = self.agent_ids
+
+    def set_timesteps(self, ts: int):
+        self.global_timesteps = ts
+        # Possession loss event: (losing_team, last_toucher_id) or None
+        self._possession_loss_event = None
 
     def reset(self, *, seed=None, options=None):
         if seed is not None:
@@ -81,12 +91,23 @@ class HaxballRLlibEnv(MultiAgentEnv):
         self.step_count = 0
         self.scores = [0, 0]
         
+        # Decide match mode based on curriculum
+        # < 10M: 50% 1v1, 50% 2v2
+        # >= 10M: 20% 1v1, 80% 2v2
+        prob_1v1 = 0.5 if self.global_timesteps < 10_000_000 else 0.2
+        self.match_mode = "1v1" if self._rng.random() < prob_1v1 else "2v2"
+
+        if self.match_mode == "1v1":
+            self.active_agent_ids = ["red_0", "blue_0"]
+        else:
+            self.active_agent_ids = self.agent_ids
+
         # Spawn ball
         self.ball = Disc(0.0, 0.0, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
         
         # Spawn agents
         self.agents = {}
-        for ag_id in self.agent_ids:
+        for ag_id in self.active_agent_ids:
             team = 1 if "red" in ag_id else 2
             # RED spawned on left (-HW), BLUE on right (+HW)
             if team == 1:
@@ -106,12 +127,11 @@ class HaxballRLlibEnv(MultiAgentEnv):
         self.tentative_start_tick = 0
         self.tentative_last_tick = 0
         
-        self._inv_pool = {}
-        self._inv_events = {ag_id: [] for ag_id in self.agent_ids}
+        self._inv_chain = []
         self._inv_last_toucher = None
         self._inv_step = 0
         
-        obs_dict = {ag_id: self._get_obs(ag_id) for ag_id in self.agent_ids}
+        obs_dict = {ag_id: self._get_obs(ag_id) for ag_id in self.active_agent_ids}
         return obs_dict, {}
 
     def step(self, action_dict):
@@ -134,6 +154,7 @@ class HaxballRLlibEnv(MultiAgentEnv):
             
         # 2. Physics Ticks
         goal_result = 0
+        self._possession_loss_event = None  # reset each step
         for _ in range(FRAME_SKIP):
             result = self._tick(ag_id_list, agent_actions)
             if result != 0:
@@ -144,8 +165,8 @@ class HaxballRLlibEnv(MultiAgentEnv):
         self._inv_step += 1
         
         # 3. Calculate Rewards & State
-        rewards = {ag_id: 0.0 for ag_id in self.agent_ids}
-        infos = {ag_id: {} for ag_id in self.agent_ids}
+        rewards = {ag_id: 0.0 for ag_id in self.active_agent_ids}
+        infos = {ag_id: {} for ag_id in self.active_agent_ids}
         terminateds = {"__all__": False}
         truncateds = {"__all__": False}
         
@@ -166,10 +187,15 @@ class HaxballRLlibEnv(MultiAgentEnv):
         for ag_id, ag in self.agents.items():
             atk = 1 if ag.team == 1 else -1
             cur_dist = _dist_to_goal_segment(self.ball.x, self.ball.y, self.HW * atk, self.goal_y, -self.goal_y)
-            delta = self._prev_dist_to_goal[ag_id] - cur_dist
-            if not goal_scored:
-                rewards[ag_id] += delta * (1.0 / (2.0 * self.HW))
             self._prev_dist_to_goal[ag_id] = cur_dist
+
+        # Positional Possession Reward (per agent)
+        # Carrier gets full reward; other teammates get 10%
+        if not goal_scored:
+            pos_reward_by_agent = self._calc_positional_possession_reward()
+            for ag_id in self.active_agent_ids:
+                if ag_id in pos_reward_by_agent:
+                    rewards[ag_id] += pos_reward_by_agent[ag_id]
 
         if self.scores[0] >= 1 or self.scores[1] >= 1:
             terminateds = {"__all__": True}
@@ -177,33 +203,147 @@ class HaxballRLlibEnv(MultiAgentEnv):
         if not terminateds["__all__"] and self.step_count >= self.max_steps:
             truncateds = {"__all__": True}
             
-        obs_dict = {ag_id: self._get_obs(ag_id) for ag_id in self.agent_ids}
+        obs_dict = {ag_id: self._get_obs(ag_id) for ag_id in self.active_agent_ids}
         
         return obs_dict, rewards, terminateds, truncateds, infos
 
+    def _calc_positional_possession_reward(self) -> dict:
+        """
+        Returns {ag_id: reward} for the positional possession reward.
+
+        Logic (per possessing team):
+          - Find the carrier: team member nearest to the ball.
+          - Count how many opponents the carrier has bypassed along the x-axis
+            by at least BYPASS_GAP units in the attack direction.
+          - 0 bypassed → +0.0001   (carrier); +0.00001 (teammates)
+          - 1 bypassed → +0.0005   (carrier); +0.00005 (teammates)
+          - 2 bypassed → +0.005    (carrier); +0.0005  (teammates)
+
+        Carrier gets full reward; other teammates get 10% of that amount.
+        Only awarded when self.possession_team != 0.
+        """
+        BYPASS_GAP = 15.0
+        # Carrier rewards
+        REWARD_0 = 0.0001
+        REWARD_1 = 0.0005
+        REWARD_2 = 0.005
+        
+        # Teammate rewards
+        REWARD_0_TM = 0.0
+        REWARD_1_TM = 0.00001
+        REWARD_2_TM = 0.00005
+
+        result = {}
+        if self.possession_team == 0:
+            return result
+
+        pteam = self.possession_team
+        atk = 1 if pteam == 1 else -1   # +1 means RED attacks right (+x)
+
+        # Find carrier: team member nearest to the ball
+        ball_x, ball_y = self.ball.x, self.ball.y
+        carrier_id = None
+        carrier = None
+        carrier_dist = float('inf')
+        for ag_id, ag in self.agents.items():
+            if ag.team != pteam:
+                continue
+            d = math.hypot(ag.x - ball_x, ag.y - ball_y)
+            if d < carrier_dist:
+                carrier_dist = d
+                carrier = ag
+                carrier_id = ag_id
+
+        if carrier is None:
+            return result
+
+        # Sanity guard: only reward when carrier is actually close
+        if carrier_dist > self.HW:
+            return result
+
+        # Count bypassed opponents
+        opp_team = 2 if pteam == 1 else 1
+        bypassed = 0
+        for ag in self.agents.values():
+            if ag.team != opp_team:
+                continue
+            gap = atk * (carrier.x - ag.x)   # positive = carrier is ahead of this opponent
+            if gap >= BYPASS_GAP:
+                bypassed += 1
+
+        if bypassed >= 2:
+            carrier_reward = REWARD_2
+            teammate_reward = REWARD_2_TM
+        elif bypassed == 1:
+            carrier_reward = REWARD_1
+            teammate_reward = REWARD_1_TM
+        else:
+            carrier_reward = REWARD_0
+            teammate_reward = REWARD_0_TM
+
+        for ag_id, ag in self.agents.items():
+            if ag.team != pteam:
+                continue
+            result[ag_id] = carrier_reward if ag_id == carrier_id else teammate_reward
+
+        return result
+
     def _handle_goal_rewards(self, rewards, infos, scoring_team):
-        # Base rewards
+        """
+        Ratio-chain investment payout at goal:
+
+        Chain example after 2 passes:
+          [(A, 0.25, s0), (B, 0.50, s1), (C, 1.00, s2)]  -- C is scorer
+
+        - Scorer (last in chain): receives ratio * GOAL_REWARD immediately.
+        - Passers (everyone else in chain): receive ratio * GOAL_REWARD
+          retroactively patched to the step they entered the chain,
+          via the existing callback mechanism (investment_credit).
+        - If chain is empty (no touches recorded): scorer gets full GOAL_REWARD.
+        """
+        GOAL_REWARD = 10.0
+        early_goal_bonus = 0.001 * max(0, self.max_steps - self.step_count)
+
+        scorer_id = self._inv_last_toucher
+
         for ag_id, ag in self.agents.items():
             if ag.team == scoring_team:
-                # Investment Algorithm Retroactive Payoff
-                credit = self._inv_pool.get(ag_id, 0.0)
-                was_scorer = (self._inv_last_toucher == ag_id)
-                scorer_base = 30.0 * 0.5 if was_scorer else 0.0
-                rewards[ag_id] += scorer_base
+                # Thưởng ghi bàn sớm cho tất cả agent thuộc đội ghi bàn
+                rewards[ag_id] += early_goal_bonus
                 
-                retro_total = (credit - (0.5 if was_scorer else 0.0)) * 30.0
-                if retro_total > 1e-6 and len(self._inv_events[ag_id]) > 0:
-                    weights = [cr for (_, cr) in self._inv_events[ag_id]]
-                    total_w = sum(weights)
-                    invest_credits = [
-                        (self._inv_step - ev_step, (w / total_w) * retro_total)
-                        for (ev_step, w) in self._inv_events[ag_id]
-                    ]
-                    infos[ag_id]["investment_credit"] = invest_credits
-                elif not was_scorer and credit == 0.0:
-                    rewards[ag_id] += 0.0 # No participation
+                # Find this agent's entry in the chain
+                chain_entry = next(((r, s) for aid, r, s in self._inv_chain if aid == ag_id), None)
+
+                if chain_entry is None:
+                    # Agent never touched the ball this possession
+                    if ag_id == scorer_id or len(self._inv_chain) == 0:
+                        # Fallback: no chain at all, give full reward
+                        rewards[ag_id] += GOAL_REWARD
+                    # else: not in chain, no reward
+                elif ag_id == scorer_id:
+                    # Scorer: pay immediately
+                    ratio, _ = chain_entry
+                    rewards[ag_id] += ratio * GOAL_REWARD
+                else:
+                    # Passer: retroactive credit back to their entry step
+                    ratio, entry_step = chain_entry
+                    steps_ago = self._inv_step - entry_step
+                    if steps_ago >= 0:
+                        infos[ag_id]["investment_credit"] = [(steps_ago, ratio * GOAL_REWARD)]
             else:
-                rewards[ag_id] -= 10.0 # Penalty for conceding
+                # Conceding penalty
+                losing_team = ag.team
+                last_toucher_id = self._inv_last_toucher
+                last_toucher_team = self.agents[last_toucher_id].team if last_toucher_id else None
+
+                if last_toucher_team == losing_team:
+                    # Own goal: only the player who scored the own goal is penalized
+                    if ag_id == last_toucher_id:
+                        rewards[ag_id] -= 6.0
+                    # else: 0.0 for other teammates
+                else:
+                    # Normal concede
+                    rewards[ag_id] -= 3.0
                 
     def _reset_positions_after_goal(self):
         self.ball = Disc(0.0, 0.0, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
@@ -299,32 +439,28 @@ class HaxballRLlibEnv(MultiAgentEnv):
                     self.possession_team = self.tentative_team
                     self.tentative_team = 0
 
-        # Investment Update
+        # Investment Update (ratio-chain)
         if touching_ag_ids:
-            # We assume investment works per team. We handle the team that currently holds possession.
-            # If possession changed, reset pool
+            # If possession changed to a new team, record loss event then reset chain
             if self.possession_team != prev_pos and prev_pos != 0:
-                self._inv_pool = {}
-                self._inv_events = {a: [] for a in self.agent_ids}
+                self._possession_loss_event = (prev_pos, self._inv_last_toucher)
+                self._inv_chain = []
                 self._inv_last_toucher = None
-            
-            # Update for the possessing team
-            possessing_touchers = [aid for aid in touching_ag_ids if self.agents[aid].team == self.possession_team]
+
+            # Only track touches from the possessing team
+            possessing_touchers = [aid for aid in touching_ag_ids
+                                   if self.agents[aid].team == self.possession_team]
             for ag_id in possessing_touchers:
                 if self._inv_last_toucher is None:
-                    self._inv_pool = {ag_id: 1.0}
+                    # First touch: start chain with ratio 1.0
+                    self._inv_chain = [(ag_id, 1.0, self._inv_step)]
                     self._inv_last_toucher = ag_id
                 elif self._inv_last_toucher != ag_id:
-                    # Pass occurred
-                    prev_toucher = self._inv_last_toucher
-                    for k in list(self._inv_pool.keys()):
-                        self._inv_pool[k] *= 0.5
-                    self._inv_pool[ag_id] = self._inv_pool.get(ag_id, 0.0) + 0.5
-                    
-                    # Log event for passer
-                    cr = self._inv_pool.get(prev_toucher, 0.0)
-                    self._inv_events[prev_toucher].append((self._inv_step, cr))
+                    # New player entered → halve all existing ratios, append new entry at 1.0
+                    self._inv_chain = [(aid, r * 0.5, s) for aid, r, s in self._inv_chain]
+                    self._inv_chain.append((ag_id, 1.0, self._inv_step))
                     self._inv_last_toucher = ag_id
+                # Same player touching again → no change
 
         # Wall/Goal Collisions
         poles = [

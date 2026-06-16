@@ -72,7 +72,7 @@ OBS_DIM   = 4 + 4 + 4 + 11 + 2 + N_TM * 9 + N_OPP * 9   # = 106
 # ─────────────────────────────────────────────────────────────────────────────
 # Training meta-constants
 # ─────────────────────────────────────────────────────────────────────────────
-FRAME_SKIP      = 6            # physics ticks per agent decision
+FRAME_SKIP      = 3            # physics ticks per agent decision
 PHYSICS_HZ     = 60
 
 TIME_MAX_SECS  = 10 * 60       # 10 minutes — fixed normalisation ceiling
@@ -163,7 +163,7 @@ class HaxballCurriculumEnv(gym.Env):
         self.legacy_obs = legacy_obs
         self._rng = np.random.default_rng(seed)
         
-        self.frame_skip = 3 if self.phase in ('A1.2', 'A0.1', 'A1') else FRAME_SKIP
+        self.frame_skip = FRAME_SKIP
 
         # Gymnasium spaces
         self.obs_dim = 100 if self.legacy_obs else OBS_DIM

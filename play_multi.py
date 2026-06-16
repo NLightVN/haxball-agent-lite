@@ -23,8 +23,8 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH      = "models/multi_agent/rllib_checkpoints/migrated_a1_21000000"  # Agent chính (Multi-agent model)
-OPPONENT_MODEL_PATH = None # Opponent model (dùng khi OPPONENT='Trained')
+A1_MODEL_PATH      = "models/multi_agent/rllib_checkpoints/a1_finetune/policies/snapshot_4000000"  # Agent chính (Multi-agent model)
+OPPONENT_MODEL_PATH = "models/multi_agent/rllib_checkpoints/a2/policies/a2_snap_3M" # Opponent model (dùng khi OPPONENT='Trained')
 A0_MODEL_PATH = None
 OPPONENT = "Human"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
 GOAL_SIZE = 64.0                        # Goal half-height in physics units
@@ -51,8 +51,16 @@ class RLlibPolicyWrapper:
         from ray.rllib.policy.policy import Policy
         if not ray.is_initialized():
             ray.init(ignore_reinit_error=True)
-        policy_path = os.path.join(path, "policies", "default_policy")
-        self.policy = Policy.from_checkpoint(policy_path)
+        
+        loaded = Policy.from_checkpoint(path)
+        if isinstance(loaded, dict):
+            # If user provided an Algorithm checkpoint path, it returns a dict of policies
+            if "learning_agent" in loaded:
+                self.policy = loaded["learning_agent"]
+            else:
+                self.policy = list(loaded.values())[0]
+        else:
+            self.policy = loaded
         
     def predict(self, obs, deterministic=False):
         action, state, info = self.policy.compute_single_action(obs, explore=not deterministic)
@@ -292,7 +300,7 @@ def draw_panel(screen, env, step, ep_reward, step_reward, episode, total_eps,
     screen.blit(controls, (WIN_W - controls.get_width() - 10, WIN_H - 18))
 
 
-def draw_features(screen, obs, env):
+def draw_features(screen, obs, env, reward_breakdown=None):
     """Draw Multi-Agent new features extracted from the observation array."""
     if obs is None:
         return
@@ -330,6 +338,30 @@ def draw_features(screen, obs, env):
         x_pos, y_pos = 14, PANEL_H + 14 + i * 26
         screen.blit(shadow, (x_pos + 1, y_pos + 1))
         screen.blit(surf, (x_pos, y_pos))
+
+    # ── Reward Breakdown Panel (top-right of field) ───────────────────────────
+    if reward_breakdown is not None:
+        rb = reward_breakdown
+        rew_items = [
+            ("[REWARDS - RED_0]",      (255, 230, 80),  None),
+            ("Possession",             (100, 200, 255), rb.get('possession',  0.0)),
+            ("Goal/Concede",           (255, 80,  80),  rb.get('goal',        0.0)),
+            ("Step Total",             (255, 255, 255), rb.get('total',       0.0)),
+        ]
+        x_rb = WIN_W - 210
+        for j, item in enumerate(rew_items):
+            label, color, val = item
+            if val is None:
+                text = label
+            else:
+                val_color = (80, 255, 120) if val > 1e-6 else ((255, 80, 80) if val < -1e-6 else (150, 160, 180))
+                text = f"{label}: {val:+.5f}"
+                color = val_color
+            surf   = FONT_SM.render(text, True, color)
+            shadow = FONT_SM.render(text, True, (0, 0, 0))
+            y_rb = PANEL_H + 14 + j * 20
+            screen.blit(shadow, (x_rb + 1, y_rb + 1))
+            screen.blit(surf,   (x_rb,     y_rb))
 
 
 def get_obs_for_agent(env, agent_index):
@@ -375,14 +407,14 @@ def main():
 
     pygame.init()
     screen = pygame.display.set_mode((WIN_W, WIN_H))
-    pygame.display.set_caption("Haxball Multi-Agent Play (2v2)")
+    pygame.display.set_caption("Haxball Multi-Agent Play (1v1)")
     clock = pygame.time.Clock()
     init_fonts()
 
     # Field surface rect (below panel, with 5px margin)
     field_rect = pygame.Rect(5, PANEL_H + 5, WIN_W - 10, FIELD_H)
 
-    env = HaxballMultiAgentEnv(phase="A1")
+    env = HaxballMultiAgentEnv(phase="1v1")
     if A0_MODEL_PATH:
         env.a0_model_path = A0_MODEL_PATH
 
@@ -429,24 +461,22 @@ def main():
         env._attack_sign = +1
         
         # Override map params based on user HBS
-        env.HW = 550.0
-        env.HH = 240.0
-        env.goal_y = 80.0
-        env.ball.radius = 6.25
-        env.ball.bcoef = 0.4
+        env.HW = 400.0
+        env.HH = 200.0
+        env.goal_y = 64.0
+        env.ball.radius = 5.8
+        env.ball.bcoef = 0.412
         
         # Override physics configs
         PLYR_R = 15.0
         PLYR_IMASS = 0.5
-        PLYR_BCOEF = 0.0
+        PLYR_BCOEF = 0.5
         PLYR_DAMP = 0.96
         
-        # Create 2v2 arrangement
+        # Create 1v1 arrangement
         env.agents = []
-        env.agents.append(Disc(-250, 0, 0, 0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=1))    # P1
-        env.agents.append(Disc(250, 0, 0, 0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=2))     # P2 (Opp)
-        env.agents.append(Disc(-150, 100, 0, 0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=1))  # P3 (Teammate)
-        env.agents.append(Disc(150, -100, 0, 0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=2))  # P4 (Opp Teammate)
+        env.agents.append(Disc(-200, 0, 0, 0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=1))    # P1
+        env.agents.append(Disc(200, 0, 0, 0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=2))     # P2 (Opp)
         
         # Reset trackers
         import math as _math
@@ -477,11 +507,17 @@ def main():
     post_done_until = 0.0        # wait this long before resetting after match ends
     waiting_reset   = False
 
+    # ── Reward tracking ───────────────────────────────────────────────────────
+    BYPASS_GAP   = 15.0          # must match env_rllib.py
+    prev_poss_team   = 0
+    reward_breakdown = {'possession': 0.0, 'goal': 0.0, 'total': 0.0}
+
     obs        = do_reset()
     ep_reward  = 0.0
     step_reward = 0.0
     step_cnt   = 0
     last_step_t = time.time()
+    prev_poss_team = env.possession_team
 
     while running:
         now = time.time()
@@ -504,6 +540,8 @@ def main():
                     flash_until   = 0.0
                     waiting_reset = False
                     last_step_t   = time.time()
+                    prev_poss_team = env.possession_team
+                    reward_breakdown = {'possession': 0.0, 'goal': 0.0, 'total': 0.0}
 
         if not running:
             break
@@ -520,6 +558,8 @@ def main():
                 waiting_reset = False
                 last_step_t   = time.time()
                 episode      += 1
+                prev_poss_team = env.possession_team
+                reward_breakdown = {'possession': 0.0, 'goal': 0.0, 'total': 0.0}
             # Draw frozen state while waiting
             screen.fill(C_BG)
             draw_field(screen, env, field_rect)
@@ -546,6 +586,8 @@ def main():
 
         # ── Physics step (time-gated to 10 Hz = real HaxBall speed) ─────────
         if now - last_step_t >= STEP_INTERVAL:
+            prev_poss_team = env.possession_team   # snapshot before ticks
+
             # Custom 2v2 loop running prediction for all agents
             goal_result = 0
             for _ in range(env.frame_skip):
@@ -583,6 +625,50 @@ def main():
             step_cnt += 1
             last_step_t = now
 
+            # ── Compute reward breakdown ──────────────────────────────────────
+            rew_possession = 0.0
+            rew_poss_loss  = 0.0
+            rew_goal       = 0.0
+            if env.possession_team == 1 and goal_result == 0:
+                red_agents = [(i, ag) for i, ag in enumerate(env.agents) if ag.team == 1]
+                carrier_i, carrier = min(
+                    red_agents,
+                    key=lambda x: math.hypot(x[1].x - env.ball.x, x[1].y - env.ball.y)
+                )
+                bypassed = sum(
+                    1 for ag in env.agents
+                    if ag.team == 2 and (carrier.x - ag.x) >= BYPASS_GAP
+                )
+                if carrier_i == 0:   # agent 0 is the carrier
+                    rew_possession = 0.005 if bypassed >= 2 else (0.0005 if bypassed >= 1 else 0.0001)
+                else:                # agent 0 is a non-carrying teammate
+                    rew_possession = 0.0005 if bypassed >= 2 else (0.00005 if bypassed >= 1 else 0.00001)
+
+            # 4. Goal / Concede terminal
+            if goal_result == 2:      # RED scores
+                rew_goal = 10.0
+            elif goal_result == 1:    # BLUE scores (RED concedes)
+                last_touch_idx = env.last_touch
+                last_touch_team = env.agents[last_touch_idx].team if last_touch_idx is not None else None
+                if last_touch_team == 1:
+                    # Own goal by RED
+                    if last_touch_idx == 0:  # RED agent 0 scored own goal
+                        rew_goal = -6.0
+                    else:                    # RED teammate scored own goal
+                        rew_goal = 0.0
+                else:
+                    # Normal concede
+                    rew_goal = -3.0
+
+            step_reward = rew_possession + rew_goal
+            ep_reward  += step_reward
+            reward_breakdown = {
+                'possession': rew_possession,
+                'goal':       rew_goal,
+                'total':      step_reward,
+            }
+            # ─────────────────────────────────────────────────────────────────
+
             terminated = (goal_result != 0)
             truncated = (env.step_count >= env.max_steps)
             done = terminated or truncated
@@ -603,7 +689,7 @@ def main():
         draw_ball(screen, env, field_rect)
         draw_panel(screen, env, step_cnt, ep_reward, step_reward, episode, episode + 1,
                    result_flash if now < flash_until else "", paused, env.opponent_type)
-        draw_features(screen, obs, env)
+        draw_features(screen, obs, env, reward_breakdown)
         pygame.display.flip()
         clock.tick(RENDER_FPS)
 

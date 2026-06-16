@@ -212,14 +212,17 @@ class HaxballA1RLlibEnv(MultiAgentEnv):
         if goal_scored:
             self._reset_positions_after_goal()
             
-        # Dense rewards
+        # Removed dense rewards
         for ag_id, ag in self.agents.items():
             atk = 1 if ag.team == 1 else -1
             cur_dist = _dist_to_goal_segment(self.ball.x, self.ball.y, self.HW * atk, self.goal_y, -self.goal_y)
-            delta = self._prev_dist_to_goal[ag_id] - cur_dist
-            if not goal_scored:
-                rewards[ag_id] += delta * (1.0 / (2.0 * self.HW))
             self._prev_dist_to_goal[ag_id] = cur_dist
+
+        # Kick penalty
+        if agent_actions[0][2] == 1:
+            rewards["red_0"] -= 0.001
+        if agent_actions[1][2] == 1:
+            rewards["blue_0"] -= 0.001
 
         if self.scores[0] >= 1 or self.scores[1] >= 1:
             terminateds = {"__all__": True}

@@ -73,7 +73,7 @@ OBS_DIM   = 26 + N_TM * 9 + N_OPP * 9   # = 107
 # ─────────────────────────────────────────────────────────────────────────────
 # Training meta-constants
 # ─────────────────────────────────────────────────────────────────────────────
-FRAME_SKIP      = 6            # physics ticks per agent decision
+FRAME_SKIP      = 3            # physics ticks per agent decision
 PHYSICS_HZ     = 60
 
 TIME_MAX_SECS  = 10 * 60       # 10 minutes — fixed normalisation ceiling
@@ -166,7 +166,7 @@ class HaxballMultiAgentEnv(gym.Env):
         self.legacy_obs = legacy_obs
         self._rng = np.random.default_rng(seed)
         
-        self.frame_skip = 3 if self.phase in ('A1.2', 'A0.1', 'A1') else FRAME_SKIP
+        self.frame_skip = FRAME_SKIP
 
         # Gymnasium spaces
         self.obs_dim = 100 if self.legacy_obs else OBS_DIM
@@ -454,6 +454,25 @@ class HaxballMultiAgentEnv(gym.Env):
                     opp_team = 2 if self.team_id == 1 else 1
                     self.agents.append(Disc(pos2[0], pos2[1], 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=opp_team))
 
+                elif self.phase == '2v2':
+                    # Spawn ball randomly anywhere on the field first, so safe_spawn works
+                    bx = float(self._rng.uniform(-self.HW + BALL_R, self.HW - BALL_R))
+                    by = float(self._rng.uniform(-self.HH + BALL_R, self.HH - BALL_R))
+                    self.ball = Disc(bx, by, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
+
+                    # Randomize 4 players in their respective halves
+                    # RED team (team 1)
+                    rx1, ry1 = self._safe_spawn(x_min=-self.HW + PLYR_R, x_max=0 - PLYR_R)
+                    self.agents.append(Disc(rx1, ry1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=1))
+                    rx2, ry2 = self._safe_spawn(x_min=-self.HW + PLYR_R, x_max=0 - PLYR_R)
+                    self.agents.append(Disc(rx2, ry2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=1))
+                    
+                    # BLUE team (team 2)
+                    bx1, by1 = self._safe_spawn(x_min=0 + PLYR_R, x_max=self.HW - PLYR_R)
+                    self.agents.append(Disc(bx1, by1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=2))
+                    bx2, by2 = self._safe_spawn(x_min=0 + PLYR_R, x_max=self.HW - PLYR_R)
+                    self.agents.append(Disc(bx2, by2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP, team=2))
+                    
                 elif self.phase == 'A1.2':
                     # Randomize players in their respective halves
                     red_x = float(self._rng.uniform(-self.HW + PLYR_R, 0 - PLYR_R))
@@ -472,7 +491,6 @@ class HaxballMultiAgentEnv(gym.Env):
                     bx = float(self._rng.uniform(-self.HW + BALL_R, self.HW - BALL_R))
                     by = float(self._rng.uniform(-self.HH + BALL_R, self.HH - BALL_R))
                     self.ball = Disc(bx, by, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
-                    
                 else:
                     self.ball = Disc(0.0, 0.0, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
                     
