@@ -14,16 +14,17 @@
 window.PPOBot = (() => {
     // ── Direction map (matches Python DIR_MAP) ─────────────────────────────
     // idx → [Input flags]
+    // UP: 1, LEFT: 2, DOWN: 4, RIGHT: 8, SHOOT: 16
     const DIR_INPUT = [
-        0,                                    // 0: stay
-        Input.RIGHT,                          // 1: right
-        Input.LEFT,                           // 2: left
-        Input.UP,                             // 3: up
-        Input.DOWN,                           // 4: down
-        Input.RIGHT | Input.UP,               // 5: up-right
-        Input.LEFT | Input.UP,               // 6: up-left
-        Input.RIGHT | Input.DOWN,             // 7: down-right
-        Input.LEFT | Input.DOWN,             // 8: down-left
+        0,         // 0: stay
+        8,         // 1: right
+        2,         // 2: left
+        1,         // 3: up
+        4,         // 4: down
+        8 | 1,     // 5: up-right
+        2 | 1,     // 6: up-left
+        8 | 4,     // 7: down-right
+        2 | 4,     // 8: down-left
     ];
 
     const FRAME_SKIP = 6;   // decision every 6 physics ticks (matches training)
@@ -114,7 +115,30 @@ window.PPOBot = (() => {
                     const kickIdx = argmax(logits, N_DIR, N_KICK);
 
                     let input = DIR_INPUT[dirIdx] || 0;
-                    if (kickIdx === 1) input |= Input.SHOOT;
+                    
+                    // Flip left/right actions if agent is on BLUE team
+                    if (agentTeam === 2) {
+                        let flippedInput = input & ~10; // 10 is 8 (RIGHT) | 2 (LEFT)
+                        if (input & 8) flippedInput |= 2; // RIGHT -> LEFT
+                        if (input & 2) flippedInput |= 8; // LEFT -> RIGHT
+                        input = flippedInput;
+                    }
+
+                    if (kickIdx === 1) {
+                        let inRange = true;
+                        // Hidden buff: only kick if ball is actually in kick range (4.0)
+                        if (player.disc && typeof discs !== 'undefined' && discs[0]) {
+                            const ball = discs[0];
+                            const pDisc = player.disc;
+                            const dx = ball.x - pDisc.x;
+                            const dy = ball.y - pDisc.y;
+                            const dist = Math.sqrt(dx*dx + dy*dy);
+                            if (dist - ball.radius - pDisc.radius > 4.0) {
+                                inRange = false;
+                            }
+                        }
+                        if (inRange) input |= 16;
+                    }
 
                     state.pendingInput = input;
                 });

@@ -227,7 +227,7 @@ window.AgentAPI = {
         obs.push(goal_y / NORM);
         obs.push(HH / NORM);
         obs.push(HW / NORM);
-        obs.push(agentTeam === 1 ? 0 : 1);
+        obs.push(0); // 0=RED, 1=BLUE (Always 0 to prevent Out-Of-Distribution for self-play opponents)
 
         // Section 2 — Agent ↔ Ball (4)
         const db_me = distBall(mx, my);
