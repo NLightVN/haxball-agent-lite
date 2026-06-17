@@ -425,7 +425,12 @@ class HaxballCurriculumEnv(gym.Env):
 
         opp_id = 2 if self.team_id == 1 else 1
 
+        turnover_penalty = 0.0
         for pid, tid in touch_events:
+            # Detect turnover: Ball was ours, now touched by opponent
+            if self.last_touch_team == self.team_id and tid == opp_id:
+                turnover_penalty -= 0.1
+                
             self.last_touch = 'A' if pid == 0 else 'O'
             self.last_touch_team = tid
             self.possession_history.append((time_now, tid))
@@ -562,9 +567,23 @@ class HaxballCurriculumEnv(gym.Env):
                 if is_pass_back:
                     mult = 0.333
                 
-                # Penalty is cushioned by invest_share if in sequence, otherwise 100%
-                penalty_share = invest_share if in_sequence else 1.0
+                # Penalty is cushioned by invest_share if in sequence AND it's our possession (pass back)
+                # If opponent has possession, EVERYONE gets 100% penalty (ai cũng nhận hình phạt như nhau)
+                if self.last_touch_team == opp_id:
+                    penalty_share = 1.0
+                else:
+                    penalty_share = invest_share if in_sequence else 1.0
+                    
                 reward -= BACKWARD_PENALTY * abs(delta_dist_to_goal) * mult * penalty_share
+
+        # Apply Instant Turnover Penalty
+        if turnover_penalty < 0.0:
+            if in_sequence:
+                # Investors take % penalty
+                reward += turnover_penalty * invest_share
+            else:
+                # Non-investors take 100% penalty
+                reward += turnover_penalty * 1.0
 
         # Goal Logic
         goal_scored = False
