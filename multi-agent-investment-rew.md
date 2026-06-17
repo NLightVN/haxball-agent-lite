@@ -30,7 +30,7 @@ Possession được cập nhật mỗi lần có người chạm bóng.
   - Possession liền trước $\le 0.25$ giây thuộc team mình (tình huống mất bóng về phía sau).
 
 ### 2.2. Ngoại lệ (Exceptions)
-- **Không phạt khi chuyền về chiến thuật**: Nếu possession liền trước 0.25s **VÀ** possession hiện tại đều là team mình $\rightarrow$ **Không phạt** khi bóng bay về phía đội mình.
+- **Phạt nhẹ khi chuyền về**: Nếu possession liền trước 0.25s **VÀ** possession hiện tại đều là team mình $\rightarrow$ **Bị phạt bằng 1/3** (so với khi để mất bóng vào tay đối thủ) khi bóng bay về phía đội mình.
 - **Không thưởng khi đối thủ chuyền về**: Nếu possession liền trước 0.25s **VÀ** possession hiện tại đều là đối thủ $\rightarrow$ **Không thưởng** khi bóng bay về phía  đối thủ.
 
 ## 3. Phân chia Zone (Khu vực sân)
@@ -75,3 +75,16 @@ Cơ chế Investment Sequence giúp chia sẻ phần thưởng cho những cầu
   Khi ghi bàn sẽ có bonus ghi bàn sớm: nếu ai có người ghi bàn trong investment sequence sẽ đc nhận bonus theo phần trăm, người ghi bàn ăn 100% bonus.
   Reward ghi bàn gốc và bị ghi bàn gốc là như nhau
 
+## 5. Cơ chế Cân bằng Đặc biệt (Chống Farm Solo)
+
+Nhằm tránh tình trạng agent lạm dụng việc tự dẫn bóng (dribble) hoặc tự chuyền cho chính mình (đập tường) để "farm" reward dâng bóng liên tục, trong bối cảnh mức phạt bị giảm chỉ còn 1/3, các cơ chế sau được áp dụng:
+
+### 5.1. Giảm thưởng khi tự rê dắt (Dribble)
+- Nếu 1 agent liên tục hold bóng, tự đi bóng (dribble) mà không chịu chuyền cho đồng đội:
+  - **Phần thưởng cho việc đưa bóng tiến lên (advance/gaining advantage) bị giảm xuống chỉ còn 1/3** (tức là phần thưởng giảm xuống đúng bằng với mức bị phạt).
+  - **Ngoại lệ:** Khi agent tung ra cú sút thực sự (shoot), phần thưởng cho cú sút vẫn được giữ nguyên (vẫn gấp 3 lần mức phạt bình thường).
+
+### 5.2. Chống tự chuyền bóng (Self-pass)
+- Khi 1 agent sút bóng, hệ thống sẽ đánh giá quỹ đạo sút để dự đoán ai là người có khả năng cắt đường chuyền tốt nhất (tính cả các pha sút đập tường nảy lại).
+- Nếu người nhiều khả năng nhận được bóng nhất (nhận gần nhất) lại **chính là agent vừa sút**, thì phần thưởng cho đường đi của bóng cũng **chỉ còn 1/3**.
+- **Điều kiện gỡ bỏ (Reset):** Trong quá trình sút/chuyền đó, nếu bóng va chạm với bất kỳ **đồng đội (teammate)** hay **đối thủ (opponent)** nào, cơ chế hạn chế đặc biệt này sẽ lập tức biến mất (trở lại mức thưởng 100%).
