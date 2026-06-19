@@ -25,7 +25,7 @@ from training.env import OBS_DIM
 N_ENVS          = 4
 TOTAL_STEPS     = 80_000_000
 CHECKPOINT_FREQ = 100_000
-DEFAULT_A01_PATH = "models/a0.1_checkpoints/a0.1_best.zip" # Fallback if specific step doesn't exist
+DEFAULT_A01_PATH = "models/a0.1_checkpoints/a0.1_5000000_steps.zip"
 
 class SharedPolicyVecEnv(VecEnv):
     """
