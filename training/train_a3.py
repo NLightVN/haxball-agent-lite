@@ -194,9 +194,9 @@ class SelfPlayManagerCallback(BaseCallback):
         if sampled_step != self.current_opponent_step:
             if self.verbose:
                 if sampled_path is None:
-                    print(f"[Self-Play] ⚔️ Loading opponent from step 0 (Basic Bots) (T={T:.0f})")
+                    print(f"[Self-Play] Loading opponent from step 0 (Basic Bots) (T={T:.0f})")
                 else:
-                    print(f"[Self-Play] ⚔️ Loading opponent from step {sampled_step} (T={T:.0f})")
+                    print(f"[Self-Play] Loading opponent from step {sampled_step} (T={T:.0f})")
             try:
                 if sampled_path is None:
                     self.training_env.set_attr('override_opponent_policy', None)
