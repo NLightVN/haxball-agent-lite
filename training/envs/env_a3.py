@@ -1018,13 +1018,13 @@ class A3Env(gym.Env):
         pass
 
     def action_masks(self) -> np.ndarray:
-        """Mask kick action if out of range (for agent 0, used in play_a3.py)."""
-        agent = self.agents[0]
-        d = math.hypot(agent.x - self.ball.x, agent.y - self.ball.y)
-        can_kick = (d - PLYR_R - BALL_R - KICK_RANGE) <= 0
-        mask = np.ones(11, dtype=bool)
-        mask[10] = can_kick
-        return mask
+        """Mask kick action if out of range for each agent."""
+        masks = np.ones((len(self.agents), 11), dtype=bool)
+        for i, agent in enumerate(self.agents):
+            d = math.hypot(agent.x - self.ball.x, agent.y - self.ball.y)
+            can_kick = (d - PLYR_R - BALL_R - KICK_RANGE) <= 0
+            masks[i, 10] = can_kick
+        return masks
 
     def close(self):
         pass

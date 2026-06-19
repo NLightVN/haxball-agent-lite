@@ -89,7 +89,15 @@ class SharedPolicyVecEnv(VecEnv):
             setattr(env, attr_name, value)
 
     def env_method(self, method_name, *method_args, indices=None, **method_kwargs):
-        return [getattr(env, method_name)(*method_args, **method_kwargs) for env in self.envs]
+        results = [getattr(env, method_name)(*method_args, **method_kwargs) for env in self.envs]
+        if method_name == "action_masks":
+            # Flatten to match self.num_envs (e.g. 12 agents instead of 4 envs)
+            flat_results = []
+            for res in results:
+                for i in range(self.agents_per_env):
+                    flat_results.append(res[i])
+            return flat_results
+        return results
         
     def env_is_wrapped(self, wrapper_class, indices=None):
         return [False] * self.num_envs
