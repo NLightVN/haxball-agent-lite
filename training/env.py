@@ -205,7 +205,7 @@ class HaxballCurriculumEnv(gym.Env):
         self.last_touch_team = None
         
         # MARL Reward Logic
-        self.investment_sequence = []
+        self.dribble_duration = 0.0
         self.opp_possession_time = 0.0
         self.dribble_start_time = 0.0
         self.self_pass_shooter = None
@@ -266,8 +266,10 @@ class HaxballCurriculumEnv(gym.Env):
         self.last_touch = None
         self.last_touch_team = None
         self.last_touch_time = -999.0       # time of last touch event (in seconds)
-        self.investment_sequence.clear()
-        self.investment_sequence = []
+        if not hasattr(self, 'marl_investment_sequences'):
+            self.marl_investment_sequences = [[], [], []]
+        for seq in self.marl_investment_sequences:
+            seq.clear()
         self.dribble_start_time = 0.0
         self.scores = [0, 0]
         self.self_pass_active = False
@@ -652,16 +654,19 @@ class HaxballCurriculumEnv(gym.Env):
                 pass
             else:
                 # Teammate (or self) touched
-                if pid in self.investment_sequence:
-                    idx = self.investment_sequence.index(pid)
-                    self.investment_sequence = self.investment_sequence[:idx+1]
-                else:
-                    self.investment_sequence.append(pid)
+                for j in range(3):
+                    if j == pid:
+                        self.marl_investment_sequences[j] = [pid]
+                    else:
+                        if pid in self.marl_investment_sequences[j]:
+                            self.marl_investment_sequences[j].remove(pid)
+                        self.marl_investment_sequences[j].append(pid)
 
         if self.last_touch_team == opp_id:
             self.opp_possession_time += (self.frame_skip / 60.0)
             if self.opp_possession_time >= 2.0:
-                self.investment_sequence.clear()
+                for seq in self.marl_investment_sequences:
+                    seq.clear()
         else:
             self.opp_possession_time = 0.0
 
@@ -693,8 +698,8 @@ class HaxballCurriculumEnv(gym.Env):
         else:
             delta_dist_to_goal = (bx - px) * atk
 
-        prev_poss_our_side = (prev_poss_0_25 == self.team_id)
-        has_possession_reward = (self.last_touch_team == self.team_id) or prev_poss_our_side
+        prev_poss_our_side = (prev_poss_0_25 is None) or (prev_poss_0_25 == self.team_id)
+        has_possession_reward = (self.last_touch_team == self.team_id) or (self.last_touch_team == opp_id and prev_poss_0_25 == self.team_id)
         has_possession_penalty = True
         
         is_opp_pass_back = (prev_poss_0_25 == opp_id and self.last_touch_team == opp_id)
@@ -744,9 +749,9 @@ class HaxballCurriculumEnv(gym.Env):
                 
                 # Assister bonus
                 for i in range(3):
-                    if i in self.investment_sequence and self.investment_sequence[-1] != i:
-                        seq_idx = self.investment_sequence.index(i)
-                        passes_away = len(self.investment_sequence) - 1 - seq_idx
+                    if i in self.marl_investment_sequences[i] and self.marl_investment_sequences[i][-1] != i:
+                        seq_idx = self.marl_investment_sequences[i].index(i)
+                        passes_away = len(self.marl_investment_sequences[i]) - 1 - seq_idx
                         invest_share = 0.3 * (0.5 ** (passes_away - 1))
                         rew_list[i] += bonus_pool * invest_share
                         
@@ -761,27 +766,50 @@ class HaxballCurriculumEnv(gym.Env):
 
             if not terminated and self.step_count >= self.max_steps:
                 truncated = True
-                
             # Per-agent reward evaluation
             self_pass_list = [False, False, False]
+            marl_mult_list = [1.0, 1.0, 1.0]
+            marl_adv_rew_list = [0.0] * 3
+            marl_back_pen_list = [0.0] * 3
+            marl_turn_pen_list = [0.0] * 3
             for i in range(3):
                 # We skip kick penalty per user feedback
                 
-                # Check pass
+                # Check pass (for info only now, mult is global)
                 self_pass = self.marl_self_pass_list[i]
                 real_pass = self.marl_real_pass_list[i]
                         
+                # We need to compute global_mult_adv and global_mult_back subjectively!
+                subj_global_mult_adv = 1.0
+                subj_global_mult_back = 1.0
+                my_seq = self.marl_investment_sequences[i]
+                if my_seq:
+                    holder_idx = my_seq[-1]
+                    if holder_idx < 3:
+                        h_self_pass = self.marl_self_pass_list[holder_idx]
+                        h_real_pass = self.marl_real_pass_list[holder_idx]
+                        penalty_mult = 0.333 if is_pass_back else 1.0
+                        
+                        if h_real_pass:
+                            subj_global_mult_adv = 1.0
+                        elif h_self_pass:
+                            subj_global_mult_adv = penalty_mult
+                            subj_global_mult_back = 0.333
+                        elif is_dribbling and agent_actions[holder_idx][2] == 0:
+                            subj_global_mult_adv = penalty_mult
+                            subj_global_mult_back = 0.333 if is_pass_back else 1.0
+
                 # Invest share
-                min_share = 0.3 * (0.5 ** 3) # 3 team members
+                min_share = 0.0
                 invest_share = min_share
                 in_sequence = False
-                if self.investment_sequence:
-                    if self.investment_sequence[-1] == i:
+                if my_seq:
+                    if my_seq[-1] == i:
                         invest_share = 1.0
                         in_sequence = True
-                    elif i in self.investment_sequence:
-                        seq_idx = self.investment_sequence.index(i)
-                        passes_away = len(self.investment_sequence) - 1 - seq_idx
+                    elif i in my_seq:
+                        seq_idx = my_seq.index(i)
+                        passes_away = len(my_seq) - 1 - seq_idx
                         invest_share = 0.3 * (0.5 ** (passes_away - 1))
                         in_sequence = True
                         
@@ -791,29 +819,32 @@ class HaxballCurriculumEnv(gym.Env):
                 
                 if delta_dist_to_goal > 0:
                     if has_possession_reward and not is_opp_pass_back:
-                        penalty_mult = 0.333 if is_pass_back else 1.0
-                        mult = 1.0
-                        if real_pass: mult = 1.0
-                        elif self_pass: mult = penalty_mult
-                        elif is_dribbling and agent_actions[i][2] == 0: mult = penalty_mult
-                        rew_list[i] += ADVANCE_REWARD * delta_dist_to_goal * mult * invest_share
+                        mult = subj_global_mult_adv
+                        marl_mult_list[i] = mult
+                        adv_val = ADVANCE_REWARD * delta_dist_to_goal * mult * invest_share
+                        rew_list[i] += adv_val
+                        marl_adv_rew_list[i] = adv_val
                 elif delta_dist_to_goal < 0:
                     if has_possession_penalty:
-                        mult = 1.0
-                        if is_pass_back: mult = 0.333
+                        mult = subj_global_mult_back
+                        marl_mult_list[i] = mult
                         
-                        penalty_share = 1.0
-                        if self.last_touch_team != opp_id:
-                            penalty_share = invest_share if in_sequence else 1.0
+                        penalty_share = invest_share if in_sequence else 1.0
                             
-                        rew_list[i] -= BACKWARD_PENALTY * abs(delta_dist_to_goal) * mult * penalty_share
+                        back_val = BACKWARD_PENALTY * abs(delta_dist_to_goal) * mult * penalty_share
+                        rew_list[i] -= back_val
+                        marl_back_pen_list[i] = -back_val
                         
                 # Turnover Penalty
                 if turnover_penalty < 0.0:
                     if in_sequence:
-                        rew_list[i] += turnover_penalty * invest_share
+                        turn_val = turnover_penalty * invest_share
+                        rew_list[i] += turn_val
+                        marl_turn_pen_list[i] = turn_val
                     else:
-                        rew_list[i] += turnover_penalty * 1.0
+                        turn_val = turnover_penalty * 1.0
+                        rew_list[i] += turn_val
+                        marl_turn_pen_list[i] = turn_val
                         
                 # Minor dense reward for ball speed (only early in training)
                 if ts < 3_000_000:
@@ -829,10 +860,14 @@ class HaxballCurriculumEnv(gym.Env):
             self._prev_ball_speed   = math.hypot(self.ball.xs, self.ball.ys)
 
             info = {
-                "marl/sequence_len": len(self.investment_sequence),
+                "marl/sequence_len": len(self.marl_investment_sequences[0]),
                 "marl/dribble_duration": getattr(self, 'dribble_duration', 0.0),
                 "marl/opp_pos_time": float(self.opp_possession_time),
                 "marl/self_pass": list(self.marl_self_pass_list),
+                "marl/mult": list(marl_mult_list),
+                "marl/adv_rew": list(marl_adv_rew_list),
+                "marl/back_pen": list(marl_back_pen_list),
+                "marl/turn_pen": list(marl_turn_pen_list),
             }
             obs_list = [self._get_obs(agent_idx=i) for i in range(3)]
             return obs_list, rew_list, terminated, truncated, [info]*3
@@ -862,13 +897,13 @@ class HaxballCurriculumEnv(gym.Env):
             min_share = 0.3 * (0.5 ** num_team_members)
             invest_share = min_share
             in_sequence = False
-            if self.investment_sequence:
-                if self.investment_sequence[-1] == 0:
+            if self.marl_investment_sequences[0]:
+                if self.marl_investment_sequences[0][-1] == 0:
                     invest_share = 1.0
                     in_sequence = True
-                elif 0 in self.investment_sequence:
-                    seq_idx = self.investment_sequence.index(0)
-                    passes_away = len(self.investment_sequence) - 1 - seq_idx
+                elif 0 in self.marl_investment_sequences[0]:
+                    seq_idx = self.marl_investment_sequences[0].index(0)
+                    passes_away = len(self.marl_investment_sequences[0]) - 1 - seq_idx
                     invest_share = 0.3 * (0.5 ** (passes_away - 1))
                     in_sequence = True
 
@@ -892,10 +927,7 @@ class HaxballCurriculumEnv(gym.Env):
                     mult = 1.0
                     if is_pass_back:
                         mult = 0.333
-                    if self.last_touch_team == opp_id:
-                        penalty_share = 1.0
-                    else:
-                        penalty_share = invest_share if in_sequence else 1.0
+                    penalty_share = invest_share if in_sequence else 1.0
                     reward -= BACKWARD_PENALTY * abs(delta_dist_to_goal) * mult * penalty_share
 
             if turnover_penalty < 0.0:
@@ -910,9 +942,9 @@ class HaxballCurriculumEnv(gym.Env):
                 base_reward = 10.0
                 bonus_pool = 3.0
                 reward += base_reward
-                if self.investment_sequence and self.investment_sequence[-1] != 0 and 0 in self.investment_sequence:
-                    seq_idx = self.investment_sequence.index(0)
-                    passes_away = len(self.investment_sequence) - 1 - seq_idx
+                if self.marl_investment_sequences[0] and self.marl_investment_sequences[0][-1] != 0 and 0 in self.marl_investment_sequences[0]:
+                    seq_idx = self.marl_investment_sequences[0].index(0)
+                    passes_away = len(self.marl_investment_sequences[0]) - 1 - seq_idx
                     invest_share = 0.3 * (0.5 ** (passes_away - 1))
                     reward += bonus_pool * invest_share
                 goal_scored = True
@@ -949,7 +981,7 @@ class HaxballCurriculumEnv(gym.Env):
                 reward += frozen_reward
                 
             info = {
-                "marl/sequence_len": len(self.investment_sequence),
+                "marl/sequence_len": len(self.marl_investment_sequences[0]),
                 "marl/dribble_duration": getattr(self, 'dribble_duration', 0.0),
                 "marl/self_pass": int(getattr(self, 'self_pass_active', False)),
                 "marl/opp_pos_time": float(self.opp_possession_time),
@@ -1190,6 +1222,18 @@ class HaxballCurriculumEnv(gym.Env):
         
         # Opponent Bottom Post
         obs[i] = (self.HW - flip * bx) / NORM;       i += 1
+        if self.marl_investment_sequences[0]:
+            if self.marl_investment_sequences[0][-1] == 0:
+                share = 1.0
+            elif 0 in self.marl_investment_sequences[0]:
+                seq_idx = self.marl_investment_sequences[0].index(0)
+                passes_away = len(self.marl_investment_sequences[0]) - 1 - seq_idx
+                share = 0.3 * (0.5 ** (passes_away - 1))
+            else:
+                share = 0.0
+        else:
+            share = 0.0
+        obs[i] = share; i += 1
         obs[i] = (bot_post_y - by) / NORM;           i += 1
 
         # Own Top Post
@@ -1248,15 +1292,15 @@ class HaxballCurriculumEnv(gym.Env):
         num_team_members = len(self.agents) // 2 if len(self.agents) > 1 else 1
         min_share = 0.3 * (0.5 ** num_team_members)
         agent_share = min_share
-        if self.investment_sequence:
-            if self.investment_sequence[-1] == 0:
+        if self.marl_investment_sequences[0]:
+            if self.marl_investment_sequences[0][-1] == 0:
                 agent_share = 1.0  # Holder
-            elif 0 in self.investment_sequence:
-                seq_idx = self.investment_sequence.index(0)
+            elif 0 in self.marl_investment_sequences[0]:
+                seq_idx = self.marl_investment_sequences[0].index(0)
                 # N is the number of passes away from the holder.
                 # sequence = [0, 1] -> holder is 1. seq_idx = 0. length = 2.
                 # passes away = len - 1 - seq_idx = 2 - 1 - 0 = 1
-                passes_away = len(self.investment_sequence) - 1 - seq_idx
+                passes_away = len(self.marl_investment_sequences[0]) - 1 - seq_idx
                 agent_share = 0.3 * (0.5 ** (passes_away - 1))
         obs[i] = agent_share; i += 1
 
@@ -1320,13 +1364,13 @@ class HaxballCurriculumEnv(gym.Env):
             obs[idx:idx+4] = [t_tx1, t_ty1, t_tx2, t_ty2]; idx += 4
 
             share = 0.0
-            if self.investment_sequence:
+            if self.marl_investment_sequences[self.team_id-1]:
                 tm_idx = self.agents.index(tm)
-                if self.investment_sequence[-1] == tm_idx:
+                if self.marl_investment_sequences[self.team_id-1][-1] == tm_idx:
                     share = 1.0
-                elif tm_idx in self.investment_sequence:
-                    seq_idx = self.investment_sequence.index(tm_idx)
-                    passes_away = len(self.investment_sequence) - 1 - seq_idx
+                elif tm_idx in self.marl_investment_sequences[self.team_id-1]:
+                    seq_idx = self.marl_investment_sequences[self.team_id-1].index(tm_idx)
+                    passes_away = len(self.marl_investment_sequences[self.team_id-1]) - 1 - seq_idx
                     share = 0.3 * (0.5 ** (passes_away - 1))
             
             obs[idx] = share; idx += 1

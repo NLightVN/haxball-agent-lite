@@ -6,7 +6,7 @@ Usage:
     python export_onnx.py --model models/a1_final --out models/a1_final.onnx
 
 Output: models/a1_final.onnx
-    Input  : obs   shape [1, 106]  float32
+    Input  : obs   shape [1, 165]  float32
     Output : logits shape [1, 11]  float32  (9 dir + 2 kick, concatenated)
 """
 
@@ -38,7 +38,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--model", default="models/a1_final", help="SB3 model path (no .zip)")
     p.add_argument("--out",   default="models/a1_final.onnx")
-    p.add_argument("--obs-dim", default=106, type=int)
+    p.add_argument("--obs-dim", default=165, type=int)
     args = p.parse_args()
 
     print(f"Loading model: {args.model}")

@@ -521,8 +521,9 @@ class A3Env(gym.Env):
                         rew_list[i] -= back_val
                         info_back[i] = -back_val
                     else:
-                        # Investor bị phạt bình thường
-                        back_val = BACKWARD_PENALTY * abs(delta) * share1
+                        # Investor bị phạt bình thường, non-investor phạt full
+                        penalty_share1 = share1 if in_seq1 else 1.0
+                        back_val = BACKWARD_PENALTY * abs(delta) * penalty_share1
                         rew_list[i] -= back_val
                         info_back[i] = -back_val
 
@@ -538,7 +539,8 @@ class A3Env(gym.Env):
                     info_adv[i]  = adv_val
                 elif delta < 0:
                     # Opponent cầm bóng: luôn phạt dù is_opp_pass_back hay không
-                    back_val = BACKWARD_PENALTY * abs(delta) * share2
+                    penalty_share = 1.0 if (self.opp_possession_time >= 2.0 or not in_seq2) else share2
+                    back_val = BACKWARD_PENALTY * abs(delta) * penalty_share
                     rew_list[i] -= back_val
                     info_back[i] = -back_val
 
