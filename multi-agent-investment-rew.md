@@ -8,7 +8,8 @@ Phiên bản hiện tại: **env.py MARL branch** — áp dụng cho Phase A0 (1
 ## 1. Hệ Thống Possession (Quyền kiểm soát bóng)
 
 ### 1.1. Possession hiện tại — `last_touch_team`
-Là **công tắc đơn giản**: mỗi khi ai đó chạm bóng, biến này lật sang team đó và **giữ nguyên** cho đến khi có người khác chạm.
+Là **công tắc đơn giản**: Possession ĐỘC QUYỀN được tính hoàn toàn dựa trên lần chạm cuối cùng (last touch).
+**Đặc biệt lưu ý:** Sự kiện chạm bóng (touch event) được ghi nhận và cập nhật liên tục ngay cả khi **chính agent đó tự chạm lại quả bóng mà họ vừa chạm** ở frame trước. Mỗi một frame có va chạm vật lý hoặc cú sút, hệ thống đều tính đó là một touch mới, qua đó reset lại bộ đếm thời gian `last_touch_time`. Biến này lật sang team đó và **giữ nguyên** cho đến khi có người khác chạm.
 
 ### 1.2. Previous Possession Among 0.25s — `prev_poss_at_touch`
 - **Được cập nhật duy nhất một lần: tại khoảnh khắc có touch mới.**
@@ -42,7 +43,7 @@ else:
 ```
 prev_poss_our_side = (prev_poss_at_touch is None) or (prev_poss_at_touch == team_id)
 
-has_possession_reward = (last_touch_team == team_id) OR prev_poss_our_side
+has_possession_reward = (last_touch_team == team_id) OR (last_touch_team == opp_id AND prev_poss_at_touch == team_id)
 has_possession_penalty = True   # luôn phạt khi bóng lùi — không có ân xá
 ```
 
@@ -51,15 +52,19 @@ has_possession_penalty = True   # luôn phạt khi bóng lùi — không có ân
 
 ### 2.2. Ngoại lệ
 
-| Tình huống | Nhân (mult) | Điều kiện |
-|---|---|---|
-| Bình thường (kick hoặc đang tiến) | `1.0` | mặc định |
-| **Dribble không sút** | `0.333` | `is_dribbling AND NOT kick` |
-| **Self-pass** (sút về chính mình) | `0.333` | `self_pass_active = True` |
-| **Pass lùi cho đồng đội** (MARL) | phạt `× 0.333` | `has_teammates AND prev_poss_our_side AND last_touch == team` |
-| **Đối thủ pass lùi** | `0` (không thưởng) | `prev_poss == opp AND last_touch == opp` |
+**Quy tắc bắt buộc:** Khi `no_pass_possession = True` HOẶC `self_pass = True`, nhân thưởng phải **bằng** nhân phạt (không được phép thưởng nhiều hơn phạt hay ngược lại).
+
+| Tình huống | Nhân thưởng | Nhân phạt | Điều kiện |
+|---|---|---|---|
+| **Sút thật / Sút bừa** | `1.0` | `1.0` | `real_pass = True` (ngay cả khi bóng bay tự do, mult vẫn giữ 1.0) |
+| **No-pass possession** (cầm bóng không chuyền) | `0.333` | `0.333` | Agent đang possess bóng nhưng chưa thực hiện real_pass cho đồng đội (bao gồm tự chạm hoặc không sút). Không dùng timer. |
+| **Self-pass** (sút về mình) | `0.333` | `0.333` | `self_pass = True` (hết hiệu lực sau 2.5s) |
+| **Pass lùi đồng đội** (MARL)| `0.333` | `0.333` | `has_teammates AND prev_poss_our_side AND last_touch == team` |
+| **Đối thủ pass lùi** | `0` | `0` | `prev_poss == opp AND last_touch == opp` |
 
 > **Lưu ý A0 (1v0):** `has_teammates = False` → ngoại lệ "pass lùi" không bao giờ kích hoạt.
+
+> **Tóm tắt mult logic:** Chỉ `real_pass = True` mới được mult = 1.0. Mọi trường hợp còn lại đều dùng mult = 0.333 cho **cả thưởng lẫn phạt** để triệt tiêu khả năng farm điểm.
 
 ### 2.3. Phân chia Zone (Khu vực sân)
 
@@ -75,16 +80,20 @@ Sân chia 3 vùng theo trục X (`zone_width = goal_y * 2.0`):
 reward += ADVANCE_REWARD  × delta_dist × mult × invest_share   (nếu delta > 0)
 reward -= BACKWARD_PENALTY × |delta_dist| × mult × penalty_share  (nếu delta < 0)
 ```
-`ADVANCE_REWARD = BACKWARD_PENALTY = 0.003`
+`ADVANCE_REWARD = BACKWARD_PENALTY = 0.0003` (đã chia 10 để giảm biến động quá mức)
 
 ---
 
 ## 3. Chuỗi Đầu Tư (Investment Sequence)
 
-### 3.1. Quy tắc hình thành
-- Mỗi khi ai chạm bóng (phe mình), họ được **append** vào `investment_sequence`.
-- Nếu người đó **đã có trong sequence**, những người sau họ bị cắt bỏ.
-- **Bị reset** nếu đối thủ giữ bóng liên tục ≥ 2 giây.
+### 3.1. Niềm tin Chủ quan (Subjective Investment Sequences)
+Trong MARL, nếu team có N người, hệ thống sẽ duy trì **N chuỗi investment_sequence khác nhau** (`marl_investment_sequences = [[], [], ...]`). Mỗi người sẽ có một "niềm tin" riêng về việc ai đã đóng góp vào pha bóng này:
+
+- **Góc nhìn của bản thân (`i == pid`):** Khi một agent tự chạm bóng, họ tin rằng mọi thứ từ đây là do họ tự làm. Chuỗi của họ **bị reset** thành `[pid]`.
+- **Góc nhìn của đồng đội (`i != pid`):** Khi thấy đồng đội chạm bóng, họ tin rằng họ đã có công luân chuyển bóng đến đó. Họ sẽ **append** `pid` vào chuỗi của họ (nếu `pid` đã có, đẩy `pid` xuống cuối).
+- **Bị reset toàn bộ:** Khi đối thủ giữ bóng liên tục ≥ 2 giây, TẤT CẢ các chuỗi đều bị xóa sạch.
+
+> **Tối thượng:** Agent `i` chỉ nhận reward dựa trên **ĐÚNG chuỗi của agent `i`**, không quan tâm người khác nghĩ gì hay có chuỗi như thế nào.
 
 ### 3.2. Phân bổ phần thưởng (`invest_share`)
 
@@ -94,28 +103,31 @@ reward -= BACKWARD_PENALTY × |delta_dist| × mult × penalty_share  (nếu delt
 | Người trước 1 pass | `0.30` |
 | Người trước 2 pass | `0.15` |
 | Người trước N pass | `0.30 × 0.5^(N-1)` |
-| Không trong sequence | `min_share = 0.3 × 0.5^(num_teammates)` |
+| Không trong sequence | `0.0` (Không được hưởng thưởng tiến bóng nếu chưa đầu tư) |
 
 ### 3.3. Phần thưởng ghi bàn
 
 ```
-Ghi bàn:       +10.0 (base)
+Ghi bàn:       +20.0 (base)
                 +3.0  (bonus_pool, chia theo invest_share cho assisters)
-Bị ghi bàn:    -10.0
+Bị ghi bàn:    -20.0
 ```
 
 ---
 
 ## 4. Cơ chế Chống Farm Solo
 
-### 4.1. Giảm thưởng khi tự dẫn bóng (Dribble)
-- Nếu agent liên tục cầm bóng không chuyền (không kick), phần thưởng đưa bóng lên giảm còn **1/3**.
-- Ngay khi sút thực sự (`kick = 1`), nhân trở về `1.0`.
+### 4.1. No-pass Possession (cầm bóng không chuyền)
+- Cờ `no_pass[i]` là một boolean đơn giản, **bật lên** khi agent `i` đang là người cuối cầm bóng (holder) nhưng chưa thực hiện `real_pass` cho đồng đội.
+- Bao gồm cả trường hợp: tự chạm bóng (va chạm vật lý), sút nhưng bóng không đến đồng đội, hoặc đơn giản chỉ đứng cạnh bóng.
+- **Phá vỡ no_pass:** Reset về `False` ngay lập tức khi `real_pass = True` (agent sút và bóng được predict đến đồng đội khác). Không dùng timer.
+- **Hậu quả:** mult_adv = mult_back = 0.333 (thưởng bằng phạt, không thể farm).
 
 ### 4.2. Chống tự chuyền bóng (Self-pass)
 - Khi sút, hệ thống predict quỹ đạo bóng 150 frames.
-- Nếu người có khả năng nhận bóng sớm nhất là **chính agent vừa sút** → `self_pass_active = True` → phần thưởng giảm còn **1/3**.
-- Reset khi bóng chạm đồng đội hoặc đối thủ.
+- Nếu người nhận là **chính agent vừa sút** → `self_pass[i] = True`.
+- Cờ này sẽ **tự động hết hạn sau 2.5 giây**, sau đó bóng thành bóng tự do nếu không ai nhặt.
+- **Cân bằng thưởng phạt:** Self-pass áp dụng mult `0.333` cho **cả phần thưởng lẫn hình phạt** để triệt tiêu hoàn toàn khả năng farm điểm âm/dương.
 
 ### 4.3. Phạt Turnover
 ```

@@ -34,7 +34,8 @@ except ModuleNotFoundError:
     sys.exit(1)
 
 from sb3_contrib import MaskablePPO
-from training.env import HaxballCurriculumEnv, DIR_MAP, KICK_STR, POLE_R
+from training.envs.env_a3 import A3Env
+from training.env import DIR_MAP, KICK_STR, POLE_R
 
 # ── Display constants ──────────────────────────────────────────────────────────
 WIN_W      = 1000
@@ -133,10 +134,15 @@ def draw_players(screen, env, surf_rect):
 
         if i < 3:
             color = C_AGENT
-            label = AGENT_LABEL if i == 0 else "A3"
+            label = AGENT_LABEL if i == 0 else f"A{i}"
         else:
-            color = (100, 150, 255) # Blue for opponent
-            label = "BOT"
+            color = (100, 150, 255)  # Blue for opponent
+            opp_i = i - 3
+            opp_types = getattr(env, '_opp_types', None)
+            if opp_types and opp_i < len(opp_types):
+                label = str(opp_types[opp_i])[:3].upper()   # e.g. "WAN", "FOL", "RAN"
+            else:
+                label = "BOT"
 
         shadow_surf = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
         pygame.draw.circle(shadow_surf, (0, 0, 0, 80), (r + 2, r + 4), r)
@@ -208,12 +214,30 @@ def draw_panel(screen, env, step, ep_reward, step_reward, episode, total_eps,
             right_lines.append(f"Self-Pass: {sp[0]} | {sp[1]} | {sp[2]}")
         else:
             right_lines.append(f"Self-Pass: {bool(sp)}")
+        mul = infos[0].get("marl/mult", [1.0, 1.0, 1.0])
+        if isinstance(mul, list):
+            right_lines.append(f"Mult: {mul[0]:.2f} | {mul[1]:.2f} | {mul[2]:.2f}")
+        else:
+            right_lines.append(f"Mult: {mul:.2f}")
+            
+        adv = infos[0].get("marl/adv_rew", [0.0, 0.0, 0.0])
+        bck = infos[0].get("marl/back_pen", [0.0, 0.0, 0.0])
+        trn = infos[0].get("marl/turn_pen", [0.0, 0.0, 0.0])
+        if isinstance(adv, list):
+            right_lines.append(f"Adv: {adv[0]:.4f} | {adv[1]:.4f} | {adv[2]:.4f}")
+            right_lines.append(f"Bck: {bck[0]:.4f} | {bck[1]:.4f} | {bck[2]:.4f}")
+            right_lines.append(f"Trn: {trn[0]:.4f} | {trn[1]:.4f} | {trn[2]:.4f}")
     for i, line in enumerate(right_lines):
         surf = FONT_SM.render(line, True, C_DIM)
         screen.blit(surf, (WIN_W - surf.get_width() - 14, 8 + i * 18))
 
-    rew_color = C_WIN if step_reward > 0.0001 else (C_LOSE if step_reward < -0.0001 else C_DIM)
-    rew_str = f"Step rew: {step_reward:+.5f}"
+    if isinstance(step_reward, list):
+        rew_str = f"Step rew: {step_reward[0]:+.5f} | {step_reward[1]:+.5f} | {step_reward[2]:+.5f}"
+        rew_color = C_WIN if step_reward[0] > 0.0001 else (C_LOSE if step_reward[0] < -0.0001 else C_DIM)
+    else:
+        rew_color = C_WIN if step_reward > 0.0001 else (C_LOSE if step_reward < -0.0001 else C_DIM)
+        rew_str = f"Step rew: {step_reward:+.5f}"
+    
     rew_surf = FONT_SM.render(rew_str, True, rew_color)
     screen.blit(rew_surf, (WIN_W // 2 - rew_surf.get_width() // 2, PANEL_H - 44))
 
@@ -234,7 +258,7 @@ def draw_panel(screen, env, step, ep_reward, step_reward, episode, total_eps,
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
-    env = HaxballCurriculumEnv(phase="A3", n_agents=6)
+    env = A3Env()
     env.total_timesteps_elapsed = 5_000_000
 
     print(f"Loading A3 model: {A3_MODEL_PATH}")
@@ -379,8 +403,8 @@ def main():
                     action.append(act)
                 
             obs, reward, terminated, truncated, infos = env.step(action)
-            step_reward = reward[0]
-            ep_reward  += reward[0]
+            step_reward = reward if isinstance(reward, list) else [reward]*3
+            ep_reward  += reward[0] if isinstance(reward, list) else reward
             step_cnt   += 1
             last_step_t = now
 
