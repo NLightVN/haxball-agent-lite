@@ -221,27 +221,23 @@ def main():
 
     load_model_path = None
     if args.continue_step > 0:
-        load_model_path = f"models/A3_checkpoints/a3_{args.continue_step}_steps.zip"
+        load_model_path = os.path.join(ROOT_DIR, f"models/A3_checkpoints/a3_{args.continue_step}_steps.zip")
     else:
-        # Load from A0.1 if starting fresh
-        if os.path.exists(DEFAULT_A01_PATH):
-            load_model_path = DEFAULT_A01_PATH
+        # Load from A0.1 pretrained if starting fresh
+        a01_path = os.path.join(ROOT_DIR, DEFAULT_A01_PATH)
+        if os.path.exists(a01_path):
+            load_model_path = a01_path
+        else:
+            print(f"[A3] ⚠️  Pretrained not found: {a01_path}")
+            print("[A3]    → Training from scratch (no A0.1 weights)")
 
     print("[A3] Initializing MaskablePPO model...")
-    if load_model_path and os.path.exists(load_model_path):
-        print(f"[A3] Loading model from {load_model_path} to fine-tune...")
-        custom_objects = {
-            "learning_rate": 5e-5,
-            "tensorboard_log": "tensorboard/A3",
-        }
-        model = MaskablePPO.load(load_model_path, env=vec_env, custom_objects=custom_objects)
-    else:
-        print(f"[Warning] Could not find file {load_model_path}, training from scratch!")
-        model = MaskablePPO(
+    def _make_scratch_model():
+        m = MaskablePPO(
             "MlpPolicy",
             vec_env,
             verbose=1,
-            tensorboard_log="tensorboard/A3",
+            tensorboard_log=os.path.join(ROOT_DIR, "tensorboard/A3"),
             n_steps=2048,
             batch_size=512,
             n_epochs=10,
@@ -255,23 +251,40 @@ def main():
             policy_kwargs=dict(net_arch=dict(pi=[256, 256], vf=[256, 256])),
         )
         with torch.no_grad():
-            model.policy.action_net.bias.data[9] += 2.1972
+            m.policy.action_net.bias.data[9] += 2.1972
+        return m
+
+    if load_model_path and os.path.exists(load_model_path):
+        print(f"[A3] Loading model from {load_model_path} to fine-tune...")
+        custom_objects = {
+            "learning_rate": 5e-5,
+            "tensorboard_log": os.path.join(ROOT_DIR, "tensorboard/A3"),
+        }
+        model = MaskablePPO.load(load_model_path, env=vec_env, custom_objects=custom_objects)
+    elif load_model_path:
+        # Path specified but file not found
+        print(f"[Warning] Could not find file: {load_model_path}")
+        print("[A3] Falling back to training from scratch!")
+        model = _make_scratch_model()
+    else:
+        # No pretrained path (a0.1 not found either) → fresh start
+        model = _make_scratch_model()
 
     checkpoint_cb = DynamicCheckpointCallback(
-        save_path   = "models/A3_checkpoints/",
+        save_path   = os.path.join(ROOT_DIR, "models/A3_checkpoints/"),
         name_prefix = "a3",
         verbose     = 1,
     )
 
     monitor_cb = A3MonitorCallback(
-        model_dir = "models/",
+        model_dir = os.path.join(ROOT_DIR, "models/"),
         verbose   = 1,
     )
 
     self_play_cb = SelfPlayManagerCallback(
-        checkpoints_dir="models/A3_checkpoints/",
-        total_steps=TOTAL_STEPS,
-        verbose=1,
+        checkpoints_dir = os.path.join(ROOT_DIR, "models/A3_checkpoints/"),
+        total_steps     = TOTAL_STEPS,
+        verbose         = 1,
     )
 
     remaining_steps = TOTAL_STEPS - args.continue_step if args.continue_step > 0 else TOTAL_STEPS
@@ -284,7 +297,7 @@ def main():
         reset_num_timesteps = False,
     )
 
-    final_path = "models/a3_final"
+    final_path = os.path.join(ROOT_DIR, "models/a3_final")
     model.save(final_path)
     print(f"[A3] Done! Final model: {final_path}.zip")
 
