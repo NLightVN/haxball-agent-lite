@@ -39,18 +39,18 @@ from gymnasium import spaces
 # ─────────────────────────────────────────────────────────────────────────────
 # Physics constants (must match test_index.html exactly)
 # ─────────────────────────────────────────────────────────────────────────────
-BALL_R        = 5.8
+BALL_R        = 6.25
 BALL_DAMP     = 0.99
-BALL_BCOEF    = 0.412
+BALL_BCOEF    = 0.4
 BALL_IMASS    = 1.5
 
 PLYR_R        = 15.0
 PLYR_DAMP     = 0.96
 PLYR_IMASS    = 0.5
-PLYR_BCOEF    = 0.5
+PLYR_BCOEF    = 0.0
 PLYR_ACC      = 0.11
 PLYR_KICK_ACC = 0.083
-KICK_STR      = 4.545
+KICK_STR      = 5.0
 KICK_RANGE    = 4.0   # surface-gap threshold: dist - r_player - r_ball < 4
 
 POLE_R        = 4.0   # Matches standard futsal map pole physics
@@ -68,7 +68,7 @@ MAX_SPEED = 10.0
 DIAG      = math.sqrt(NORM ** 2 + NORM ** 2)   # ≈ 1131.4
 N_TM      = 4   # max teammate slots
 N_OPP     = 5   # max opponent slots
-OBS_DIM = 4 + 4 + 4 + 11 + 2 + N_TM * 9 + N_OPP * 9 + 3 + 3 + 1 + 5 + 4 + N_TM * 4 + N_OPP * 4  # = 158
+OBS_DIM = 4 + 7 + 8 + 11 + 2 + 12 + N_TM * 14 + N_OPP * 13  # = 165
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Training meta-constants
@@ -86,7 +86,8 @@ MAX_STEPS_ALL_MODES = 6000
 MAP_PRESETS = [
     (368.0, 171.0, 64.0, '1v1'),   
     (520.0, 242.0, 76.0, '2v2'),   
-    (401.0, 200.0, 70.0, '2v2'),   
+    (401.0, 200.0, 70.0, '2v2'),
+    (620.0, 270.0, 80.0, '3v3'),
 ]
 
 # Field & Time Curriculum Thresholds
@@ -156,9 +157,10 @@ class HaxballCurriculumEnv(gym.Env):
 
     metadata = {'render_modes': []}
 
-    def __init__(self, n_agents: int = 1, seed: Optional[int] = None):
+    def __init__(self, phase: str = 'A0', n_agents: int = 1, seed: Optional[int] = None):
         super().__init__()
 
+        self.phase = phase
         self.n_agents = n_agents
         self._rng = np.random.default_rng(seed)
         
@@ -203,7 +205,6 @@ class HaxballCurriculumEnv(gym.Env):
         self.last_touch_team = None
         
         # MARL Reward Logic
-        self.possession_history = deque(maxlen=15)  # 0.25s at 60Hz physics (FRAME_SKIP is used, but physics ticks are 60Hz. step() represents frame_skip ticks. Wait, history should be in terms of real time. If step is 6 ticks, 15 ticks = 2.5 steps. We'll store (time_sec, team_id) and clean old ones.)
         self.investment_sequence = []
         self.opp_possession_time = 0.0
         self.dribble_start_time = 0.0
@@ -223,6 +224,7 @@ class HaxballCurriculumEnv(gym.Env):
         self._prev_ball_x       = 0.0
         self._prev_ball_y       = 0.0
         self._prev_ball_speed   = 0.0
+        self.last_action_kick   = 0
 
     # ─── reset ────────────────────────────────────────────────────────────────
     def reset(self, *, seed=None, options=None):
@@ -230,7 +232,20 @@ class HaxballCurriculumEnv(gym.Env):
             self._rng = np.random.default_rng(seed)
 
         ep_secs = 90 # 1.5 minutes
+        if getattr(self, 'phase', '') in ['A0', 'A0.1']:
+            ep_secs = 15
         self.max_steps = ep_secs * PHYSICS_HZ // self.frame_skip
+        
+        ts = getattr(self, 'total_timesteps_elapsed', 0)
+        if getattr(self, 'phase', '') == 'A3':
+            self.max_steps = 1800
+        elif getattr(self, 'phase', '') == 'A0.1':
+            self.max_steps = 300
+        else:
+            if 2_000_000 <= ts < 4_000_000:
+                self.max_steps = 300
+            elif ts >= 4_000_000:
+                self.max_steps = 200
         self.step_count = 0
         self.scores = [0, 0]
 
@@ -250,18 +265,26 @@ class HaxballCurriculumEnv(gym.Env):
         
         self.last_touch = None
         self.last_touch_team = None
-        self.possession_history.clear()
+        self.last_touch_time = -999.0       # time of last touch event (in seconds)
         self.investment_sequence.clear()
-        self.opp_possession_time = 0.0
+        self.investment_sequence = []
         self.dribble_start_time = 0.0
-        self.self_pass_shooter = None
+        self.scores = [0, 0]
         self.self_pass_active = False
         self.real_pass_active = False
+        self.marl_self_pass_list = [False, False, False]
+        self.marl_real_pass_list = [False, False, False]
+        self.opp_possession_time = 0.0
+        self.prev_poss_at_touch = None  # frozen at moment of touch, updated only on touch events
+        self.last_action_kick = 0
 
-        return self._get_obs(), {}
+        if getattr(self, 'phase', '') == 'A3':
+            return [self._get_obs(agent_idx=i) for i in range(3)], {}
+        else:
+            return self._get_obs(agent_idx=0), {}
 
     def _reset_positions(self):
-        size_class = '1v1'
+        size_class = '3v3' if getattr(self, 'phase', '') in ['A0.1', 'A3'] else '1v1'
         cands = [p for p in MAP_PRESETS if p[3] == size_class] or MAP_PRESETS
         preset = cands[int(self._rng.integers(0, len(cands)))]
         
@@ -269,41 +292,182 @@ class HaxballCurriculumEnv(gym.Env):
         self.HW = float(preset[0])
         self.goal_y = float(preset[2])
         self.goal_center_y = 0.0
+
+        # Map Randomization for A0
+        if getattr(self, 'phase', '') == 'A0' and size_class == '1v1':
+            scale = self._rng.uniform(0.8, 1.1)
+            self.HW *= scale
+            self.HH *= scale
+            self.goal_y = self._rng.uniform(60.0, 70.0)
         
-        # Determine opponent type (keep only Random, Pazzo, Wanderer, and maybe Static)
-        # We will randomly pick from the "4 random bots". Let's assume Static is the 4th since it has no logic.
-        # If user meant something else, we can adjust.
-        r = self._rng.random()
-        if r < 0.25:
-            self.opponent_type = 'Random'
-        elif r < 0.5:
-            self.opponent_type = 'Pazzo'
-        elif r < 0.75:
-            self.opponent_type = 'Wanderer'
+        # Determine opponent type
+        if getattr(self, 'override_opponent_policy', None) is not None:
+            self.opponent_types = ['Trained'] * 10
+            self.opponent_type = 'Trained'
+            self.opponent_policy = self.override_opponent_policy
         else:
-            self.opponent_type = 'Static'
+            bot_pool = ['Random', 'Pazzo', 'Wanderer', 'Static']
+            self.opponent_types = [self._rng.choice(bot_pool) for _ in range(10)]
+            self.opponent_type = self.opponent_types[0]
+            self.opponent_policy = None
             
         self.episode_type = 'opponent'
-        self.opponent_policy = None
 
         # Positions
         self.agents = []
-        red_x = float(self._rng.uniform(-self.HW + PLYR_R, 0 - PLYR_R))
-        red_y = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
-        blue_x = float(self._rng.uniform(0 + PLYR_R, self.HW - PLYR_R))
-        blue_y = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
+        num_per_team = 3 if getattr(self, 'phase', '') == 'A3' else 1
+        
+        # Red team
+        for _ in range(num_per_team):
+            x = float(self._rng.uniform(-self.HW + PLYR_R, 0 - PLYR_R))
+            y = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
+            self.agents.append(Disc(x, y, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+            
+        # Blue team
+        if self.n_agents > 1 or getattr(self, 'phase', '') == 'A3':
+            for _ in range(num_per_team):
+                x = float(self._rng.uniform(0 + PLYR_R, self.HW - PLYR_R))
+                y = float(self._rng.uniform(-self.HH + PLYR_R, self.HH - PLYR_R))
+                self.agents.append(Disc(x, y, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
 
-        if self.team_id == 1:
-            self.agents.append(Disc(red_x, red_y, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Agent (RED)
-            self.agents.append(Disc(blue_x, blue_y, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Opp (BLUE)
+        # Re-arrange based on team_id
+        if self.team_id == 2:
+            self.agents = self.agents[num_per_team:] + self.agents[:num_per_team]
+
+        # Spawn ball
+        if getattr(self, 'phase', '') == 'A3':
+            self.ball = Disc(0.0, 0.0, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
         else:
-            self.agents.append(Disc(blue_x, blue_y, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Agent (BLUE)
-            self.agents.append(Disc(red_x, red_y, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Opp (RED)
+            bx = float(self._rng.uniform(-self.HW + BALL_R, self.HW - BALL_R))
+            by = float(self._rng.uniform(-self.HH + BALL_R, self.HH - BALL_R))
+            self.ball = Disc(bx, by, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
 
-        # Spawn ball uniformly anywhere on the field
-        bx = float(self._rng.uniform(-self.HW + BALL_R, self.HW - BALL_R))
-        by = float(self._rng.uniform(-self.HH + BALL_R, self.HH - BALL_R))
-        self.ball = Disc(bx, by, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
+        # ── Special Training (>= 2M steps) ──
+        if getattr(self, 'phase', '') == 'A3':
+            return
+
+        ts = getattr(self, 'total_timesteps_elapsed', 0)
+        atk = self._attack_sign
+        own_goal_x = -self.HW * atk
+        opp_goal_x = self.HW * atk
+        
+        if ts >= 3_000_000:
+            r = self._rng.random()
+            if r < 0.2:
+                # 20% ball right in front of own goal, agent in kick range, angle to own goal
+                gap = max(0, self.goal_y - 10)
+                y_pos = float(self._rng.uniform(-gap, gap))
+                self.ball.x = float(own_goal_x + 20.0 * atk)
+                self.ball.y = y_pos
+                
+                dx = own_goal_x - self.ball.x
+                dy = 0.0
+                dist = math.hypot(dx, dy)
+                if dist > 0:
+                    dx /= dist; dy /= dist
+                else:
+                    dx = atk; dy = 0.0
+                    
+                place_dist = PLYR_R + BALL_R + (KICK_RANGE * 0.5)
+                self.agents[0].x = float(self.ball.x - dx * place_dist)
+                self.agents[0].y = float(self.ball.y - dy * place_dist)
+                
+            elif r < 0.45:
+                # 25% ball right at the sideline (top or bottom), agent nearby
+                is_top = self._rng.random() < 0.5
+                y_pos = float(-self.HH + BALL_R if is_top else self.HH - BALL_R)
+                x_pos = float(self._rng.uniform(-self.HW + BALL_R + 50, self.HW - BALL_R - 50))
+                
+                self.ball.x = x_pos
+                self.ball.y = y_pos
+                
+                # Place agent close to the ball
+                agent_y_offset = (PLYR_R + BALL_R + 2.0) if is_top else -(PLYR_R + BALL_R + 2.0)
+                self.agents[0].x = x_pos
+                self.agents[0].y = y_pos + agent_y_offset
+                
+            elif r < 0.7:
+                # 25% ball right at the endline (left or right), agent nearby
+                is_left = self._rng.random() < 0.5
+                x_pos = float(-self.HW + BALL_R if is_left else self.HW - BALL_R)
+                
+                # Must avoid spawning inside or directly in front of the goal
+                is_top_half = self._rng.random() < 0.5
+                if is_top_half:
+                    y_pos = float(self._rng.uniform(-self.HH + BALL_R, -self.goal_y - BALL_R - 5.0))
+                else:
+                    y_pos = float(self._rng.uniform(self.goal_y + BALL_R + 5.0, self.HH - BALL_R))
+                    
+                self.ball.x = x_pos
+                self.ball.y = y_pos
+                
+                # Place agent close to the ball
+                agent_x_offset = (PLYR_R + BALL_R + 2.0) if is_left else -(PLYR_R + BALL_R + 2.0)
+                self.agents[0].x = x_pos + agent_x_offset
+                self.agents[0].y = y_pos
+                
+            else:
+                # 30% random (do nothing, keep standard spawn)
+                pass
+            
+        elif ts >= 2_000_000:
+            r = self._rng.random()
+            
+            if r < 0.3:
+                # 30% random (do nothing, keep standard spawn)
+                pass
+            elif r < 0.6:
+                # 30% at opponent's HW sideline, but not inside [-goal_y, goal_y]
+                y_cands = []
+                if self.HH - PLYR_R > self.goal_y + PLYR_R:
+                    y_cands.append((self.goal_y + PLYR_R, self.HH - PLYR_R))
+                if -self.HH + PLYR_R < -self.goal_y - PLYR_R:
+                    y_cands.append((-self.HH + PLYR_R, -self.goal_y - PLYR_R))
+                
+                if y_cands:
+                    yrange = y_cands[self._rng.integers(0, len(y_cands))]
+                    y_pos = float(self._rng.uniform(yrange[0], yrange[1]))
+                    
+                    self.ball.x = float(opp_goal_x - 15.0 * atk)
+                    self.ball.y = y_pos
+                    self.agents[0].x = float(self.ball.x - 30.0 * atk)
+                    self.agents[0].y = y_pos
+            elif r < 0.9:
+                # 30% right in front of own goal
+                gap = max(0, self.goal_y - 10)
+                y_pos = float(self._rng.uniform(-gap, gap))
+                self.ball.x = float(own_goal_x + 30.0 * atk)
+                self.ball.y = y_pos
+                touch_dist = PLYR_R + BALL_R + 0.1
+                self.agents[0].x = float(self.ball.x + touch_dist * atk)
+                self.agents[0].y = y_pos
+            else:
+                # 10% ball right in front of own goal, agent in kick range, angle to own goal
+                gap = max(0, self.goal_y - 10)
+                y_pos = float(self._rng.uniform(-gap, gap))
+                self.ball.x = float(own_goal_x + 20.0 * atk)
+                self.ball.y = y_pos
+                
+                # Agent placed opposite to own goal from ball (so kicking sends it to own goal)
+                dx = own_goal_x - self.ball.x
+                dy = 0.0
+                dist = math.hypot(dx, dy)
+                if dist > 0:
+                    dx /= dist; dy /= dist
+                else:
+                    dx = atk; dy = 0.0
+                    
+                place_dist = PLYR_R + BALL_R + (KICK_RANGE * 0.5)
+                self.agents[0].x = float(self.ball.x - dx * place_dist)
+                self.agents[0].y = float(self.ball.y - dy * place_dist)
+
+            # Prevent other agents from spawning on top of the special spawn
+            for i in range(1, len(self.agents)):
+                ag = self.agents[i]
+                if math.hypot(ag.x - self.ball.x, ag.y - self.ball.y) < PLYR_R + BALL_R + 10 or \
+                   math.hypot(ag.x - self.agents[0].x, ag.y - self.agents[0].y) < PLYR_R * 2 + 10:
+                    safe_x, safe_y = self._safe_spawn()
+                    ag.x, ag.y = safe_x, safe_y
 
     def _safe_spawn(self, max_tries: int = 80, x_min: float = None, x_max: float = None):
         """Return (x, y) not overlapping ball or already-placed agents.
@@ -346,8 +510,8 @@ class HaxballCurriculumEnv(gym.Env):
         for t in range(1, 151):
             bx += bxs
             by += bys
-            bxs *= self.ball.bCoef
-            bys *= self.ball.bCoef
+            bxs *= self.ball.damp
+            bys *= self.ball.damp
             
             for ag in self.agents:
                 dist = math.hypot(ag.x - bx, ag.y - by)
@@ -355,59 +519,87 @@ class HaxballCurriculumEnv(gym.Env):
                 # max_speed is roughly 3.0
                 if dist <= (ag.radius + self.ball.radius + 3.0 * t):
                     return ag
-        return None
+                    
+        # If no one intercepts within 2.5s, return the closest agent to the ball's final predicted position
+        closest_ag = None
+        min_dist = float('inf')
+        for ag in self.agents:
+            dist = math.hypot(ag.x - bx, ag.y - by)
+            if dist < min_dist:
+                min_dist = dist
+                closest_ag = ag
+                
+        return closest_ag
 
     def step(self, action):
         assert self.ball is not None, "Call reset() before step()"
 
-        dir_idx = int(action[0])
-        kick    = int(action[1])
-        dx, dy  = DIR_MAP[dir_idx]
+        self.kick_exhausted = [False] * len(self.agents)
+
+        agent_actions = []
+        is_marl = getattr(self, 'phase', '') == 'A3'
         
-        agent_actions = [(dx * self._flip, dy, kick)]
+        if is_marl:
+            for act in action:
+                dir_idx = int(act[0])
+                kick    = int(act[1])
+                dx, dy  = DIR_MAP[dir_idx]
+                agent_actions.append((dx * self._flip, dy, kick))
+            self.last_action_kick = int(action[0][1])
+        else:
+            dir_idx = int(action[0])
+            kick    = int(action[1])
+            self.last_action_kick = kick
+            dx, dy  = DIR_MAP[dir_idx]
+            agent_actions.append((dx * self._flip, dy, kick))
         
         # Determine opponent action
-        if self.phase in ('A1', 'A1.2', 'A0.1') and len(self.agents) > 1:
-            if self.opponent_type == 'Defender':
-                agent_actions.append(self._get_defender_action())
-            elif self.opponent_type == 'Attacker':
-                agent_actions.append(self._get_attacker_action())
-            elif self.opponent_type == 'Hybrid':
-                if self.last_touch == 'A':
-                    self._hybrid_mode = 'defender'
-                elif self.last_touch == 'O':
-                    self._hybrid_mode = 'follower'
-                if self._hybrid_mode == 'defender':
-                    agent_actions.append(self._get_defender_action())
+        if self.phase in ('A1', 'A1.2', 'A0.1', 'A3') and len(self.agents) > len(agent_actions):
+            num_opps = len(self.agents) - len(agent_actions)
+            num_agents = len(agent_actions)
+            for opp_i in range(num_opps):
+                ag = self.agents[num_agents + opp_i]
+                opp_type = self.opponent_types[opp_i] if hasattr(self, 'opponent_types') else self.opponent_type
+                
+                if opp_type == 'Defender':
+                    agent_actions.append(self._get_defender_action(ag))
+                elif opp_type == 'Attacker':
+                    agent_actions.append(self._get_attacker_action(ag))
+                elif opp_type == 'Hybrid':
+                    if self.last_touch == 'A':
+                        self._hybrid_mode = 'defender'
+                    elif self.last_touch == 'O':
+                        self._hybrid_mode = 'follower'
+                    if self._hybrid_mode == 'defender':
+                        agent_actions.append(self._get_defender_action(ag))
+                    else:
+                        agent_actions.append(self._get_follower_action(ag))
+                elif opp_type == 'Trained' and self.opponent_policy is not None:
+                    opp_obs = self._get_obs_for_opponent(opp_i)
+                    opp_action, _ = self.opponent_policy.predict(opp_obs, deterministic=False)
+                    opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
+                    agent_actions.append((opp_dx * -self._flip, opp_dy, int(opp_action[1])))
+                elif opp_type == 'Human':
+                    agent_actions.append(self.human_opponent_action)
+                elif opp_type == 'Static':
+                    agent_actions.append(self._get_static_action())
+                elif opp_type == 'Random':
+                    agent_actions.append(self._get_random_action())
+                elif opp_type == 'Pazzo':
+                    agent_actions.append(self._get_pazzo_action(ag, opp_i))
+                elif opp_type == 'Wanderer':
+                    agent_actions.append(self._get_wanderer_action(ag, opp_i))
                 else:
-                    agent_actions.append(self._get_follower_action())
-            elif self.opponent_type == 'Trained' and self.opponent_policy is not None:
-                opp_obs = self._get_obs_for_opponent()
-                opp_action, _ = self.opponent_policy.predict(opp_obs, deterministic=False)
-                opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
-                agent_actions.append((opp_dx * -self._flip, opp_dy, int(opp_action[1])))
-            elif self.opponent_type == 'Human':
-                agent_actions.append(self.human_opponent_action)
-            elif self.opponent_type == 'Static':
-                agent_actions.append(self._get_static_action())
-            elif self.opponent_type == 'Random':
-                agent_actions.append(self._get_random_action())
-            elif self.opponent_type == 'Pazzo':
-                agent_actions.append(self._get_pazzo_action())
-            elif self.opponent_type == 'Wanderer':
-                agent_actions.append(self._get_wanderer_action())
-            else:
-                agent_actions.append((0.0, 0.0, 0))
+                    agent_actions.append((0.0, 0.0, 0))
 
         goal_result = 0
         touch_events = []
         
         for _ in range(self.frame_skip):
-            self.last_touch_player_this_tick = None
-            self.last_touch_team_this_tick = None
+            self.touches_this_tick = []
             result = self._tick(agent_actions)
-            if self.last_touch_player_this_tick is not None:
-                touch_events.append((self.last_touch_player_this_tick, self.last_touch_team_this_tick))
+            for touch in self.touches_this_tick:
+                touch_events.append(touch)
                 
             if result != 0:
                 goal_result = result
@@ -416,25 +608,34 @@ class HaxballCurriculumEnv(gym.Env):
         # ── MARL Possession & Investment Sequence Logic ───────────────────────
         self.step_count += 1
         time_now = self.step_count * (self.frame_skip / 60.0)
-        
-        # Clean up old possession history (> 0.25s ago)
-        while self.possession_history and (time_now - self.possession_history[0][0]) > 0.25:
-            self.possession_history.popleft()
-            
-        possession_0_25s = self.possession_history[0][1] if self.possession_history else None
+
+        # prev_poss_0_25: frozen at moment of last touch. Read from self.prev_poss_at_touch.
+        # Updated inside the touch loop below.
+        prev_poss_0_25 = self.prev_poss_at_touch
 
         opp_id = 2 if self.team_id == 1 else 1
 
         turnover_penalty = 0.0
         for pid, tid in touch_events:
+            # Capture prev_poss at the moment of touch.
+            # prev = who had it before (last_touch_team), valid only within 0.25s.
+            dt = time_now - self.last_touch_time
+            if self.last_touch_team is not None and self.last_touch_team != tid and dt <= 0.25:
+                # Previous possessor was a different team and within 0.25s window
+                self.prev_poss_at_touch = self.last_touch_team
+            else:
+                # Same team (continuous hold) or ball was free too long → None
+                self.prev_poss_at_touch = None
+            prev_poss_0_25 = self.prev_poss_at_touch
+
             # Detect turnover: Ball was ours, now touched by opponent
             if self.last_touch_team == self.team_id and tid == opp_id:
                 turnover_penalty -= 0.1
-                
+
             self.last_touch = 'A' if pid == 0 else 'O'
             self.last_touch_team = tid
-            self.possession_history.append((time_now, tid))
-            
+            self.last_touch_time = time_now
+
             # Reset dribble timer if different player touched
             if hasattr(self, '_last_touch_pid') and self._last_touch_pid != pid:
                 self.dribble_start_time = time_now
@@ -443,25 +644,19 @@ class HaxballCurriculumEnv(gym.Env):
             self._last_touch_pid = pid
 
             # Investment Sequence Tracking
+            self.self_pass_active = False
+            self.real_pass_active = False
+            self.marl_self_pass_list = [False, False, False]
+            self.marl_real_pass_list = [False, False, False]
             if tid == opp_id:
-                # If opponent touched, do not immediately clear sequence unless they hold for 2s.
-                # However, if self-pass active and touches opponent, remove self-pass limit
-                self.self_pass_active = False
-                self.real_pass_active = False
+                pass
             else:
                 # Teammate (or self) touched
-                self.self_pass_active = False
-                self.real_pass_active = False # Hit a teammate
-                if pid == 0:
-                    # Agent (Tôi) touched -> reset sequence
-                    self.investment_sequence = [pid]
+                if pid in self.investment_sequence:
+                    idx = self.investment_sequence.index(pid)
+                    self.investment_sequence = self.investment_sequence[:idx+1]
                 else:
-                    # Teammate touched
-                    if pid in self.investment_sequence:
-                        idx = self.investment_sequence.index(pid)
-                        self.investment_sequence = self.investment_sequence[:idx+1]
-                    else:
-                        self.investment_sequence.append(pid)
+                    self.investment_sequence.append(pid)
 
         if self.last_touch_team == opp_id:
             self.opp_possession_time += (self.frame_skip / 60.0)
@@ -470,24 +665,11 @@ class HaxballCurriculumEnv(gym.Env):
         else:
             self.opp_possession_time = 0.0
 
-        # Anti-self pass detection on KICK using Greedy Prediction
-        if kick and self.last_touch_team == self.team_id:
-            # Predict the receiver of the ball
-            receiver = self._predict_greedy_receiver()
-            # If the predicted receiver is the agent itself (agents[0]), it's a self pass
-            if receiver is self.agents[0]:
-                self.self_pass_active = True
-                self.real_pass_active = False
-            else:
-                self.self_pass_active = False
-                self.real_pass_active = True
-        self.real_pass_active = False
-
         # ── Reward ────────────────────────────────────────────────────────────
         reward = 0.0
         terminated = False
         truncated = False
-
+        
         atk = self._attack_sign
         goal_x = self.HW * atk
 
@@ -499,139 +681,280 @@ class HaxballCurriculumEnv(gym.Env):
         zone_width = self.goal_y * 2.0
         
         if adv_x <= -self.HW + zone_width:
-            # Zone 1 (Sân nhà)
             own_goal_x = -self.HW * atk
             cur_dist = math.hypot(bx - own_goal_x, by)
             prev_dist = math.hypot(px - own_goal_x, py)
             delta_dist_to_goal = cur_dist - prev_dist
         elif adv_x >= self.HW - zone_width:
-            # Zone 3 (Sân khách)
             opp_goal_x = self.HW * atk
             cur_dist = math.hypot(bx - opp_goal_x, by)
             prev_dist = math.hypot(px - opp_goal_x, py)
             delta_dist_to_goal = prev_dist - cur_dist
         else:
-            # Zone 2 (Giữa sân)
             delta_dist_to_goal = (bx - px) * atk
-        
-        # Ball Movement Reward Rules
-        # + if (current_pos == self or pos_0_25 == self) and moving forward
-        # - if (current_pos == opp or pos_0_25 == self) and moving backward
-        has_possession_reward = (self.last_touch_team == self.team_id) or (possession_0_25s == self.team_id)
-        has_possession_penalty = (self.last_touch_team == opp_id) or (possession_0_25s == self.team_id)
-        
-        # Determine invest_share for the current agent
-        num_team_members = len(self.agents) // 2 if len(self.agents) > 1 else 1
-        min_share = 0.3 * (0.5 ** num_team_members)
-        invest_share = min_share
-        in_sequence = False
-        if self.investment_sequence:
-            if self.investment_sequence[-1] == 0:
-                invest_share = 1.0
-                in_sequence = True
-            elif 0 in self.investment_sequence:
-                seq_idx = self.investment_sequence.index(0)
-                passes_away = len(self.investment_sequence) - 1 - seq_idx
-                invest_share = 0.3 * (0.5 ** (passes_away - 1))
-                in_sequence = True
 
-        ADVANCE_REWARD = 0.003
-        BACKWARD_PENALTY = 0.003
+        prev_poss_our_side = (prev_poss_0_25 == self.team_id)
+        has_possession_reward = (self.last_touch_team == self.team_id) or prev_poss_our_side
+        has_possession_penalty = True
         
-        # Exception: Pass back to teammate -> 1/3 penalty
-        is_pass_back = (possession_0_25s == self.team_id and self.last_touch_team == self.team_id)
+        is_opp_pass_back = (prev_poss_0_25 == opp_id and self.last_touch_team == opp_id)
+        has_teammates = len(self.agents) > 1
+        is_pass_back = has_teammates and (prev_poss_our_side and self.last_touch_team == self.team_id)
         
-        # Exception: Opp pass back to opp -> no reward
-        is_opp_pass_back = (possession_0_25s == opp_id and self.last_touch_team == opp_id)
+        dribble_duration = time_now - getattr(self, 'dribble_start_time', time_now)
+        is_dribbling = (dribble_duration > 0.0)
         
-        dribble_duration = time_now - self.dribble_start_time
-        is_dribbling = (dribble_duration > 0.0) # NO DELAY! threshold is 0.0 seconds
-        
-        if delta_dist_to_goal > 0: # Ball advanced (good)
-            if has_possession_reward and not is_opp_pass_back:
-                # Calculate multiplier
-                mult = 1.0
-                if self.real_pass_active:
-                    mult = 1.0
-                elif self.self_pass_active:
-                    mult = 0.333
-                elif is_dribbling and not kick:
-                    mult = 0.333
-                
-                # Multiply by invest_share (Reward is shared)
-                reward += ADVANCE_REWARD * delta_dist_to_goal * mult * invest_share
-                
-        elif delta_dist_to_goal < 0: # Ball moved back (bad)
-            if has_possession_penalty:
-                mult = 1.0
-                if is_pass_back:
-                    mult = 0.333
-                
-                # Penalty is cushioned by invest_share if in sequence AND it's our possession (pass back)
-                # If opponent has possession, EVERYONE gets 100% penalty (ai cũng nhận hình phạt như nhau)
-                if self.last_touch_team == opp_id:
-                    penalty_share = 1.0
-                else:
-                    penalty_share = invest_share if in_sequence else 1.0
-                    
-                reward -= BACKWARD_PENALTY * abs(delta_dist_to_goal) * mult * penalty_share
-
-        # Apply Instant Turnover Penalty
-        if turnover_penalty < 0.0:
-            if in_sequence:
-                # Investors take % penalty
-                reward += turnover_penalty * invest_share
-            else:
-                # Non-investors take 100% penalty
-                reward += turnover_penalty * 1.0
-
-        # Goal Logic
-        goal_scored = False
+        # Frozen Reward (Events)
+        frozen_reward = 0.0
         if goal_result == 2:
-            self.scores[self.team_id - 1] += 1
-            base_reward = 12.0
-            
-            # Investor Reward (Agent only gets the base reward if they scored directly, but if a teammate scored, 
-            # agent gets investor share if in sequence. Since this is single agent control for now, if sequence has agent, they get share.)
-            # If agent is the scorer (pid == 0 in sequence[-1]):
-            if self.investment_sequence and self.investment_sequence[-1] == 0:
-                reward += base_reward
-            elif 0 in self.investment_sequence:
-                idx = self.investment_sequence.index(0)
-                # Investor formula: 30% * (1/2)^(N-1)
-                N = len(self.investment_sequence) - idx
-                invest_share = 0.3 * (0.5 ** (N - 1))
-                reward += base_reward * invest_share
-            else:
-                reward += base_reward # If agent wasn't involved at all, still give full reward? Or maybe just base?
-
-            goal_scored = True
-            terminated = True
-            
+            frozen_reward += 10.0
         elif goal_result == 1:
-            self.scores[opp_id - 1] += 1
-            reward -= 10.0
-            goal_scored = True
-            terminated = True
+            frozen_reward -= 15.0
+            
+        ts = getattr(self, 'total_timesteps_elapsed', 0)
+        
+        if getattr(self, 'phase', '') == 'A3':
+            rew_list = [0.0] * 3
+            
+            # Anti-self pass detection using Greedy Prediction
+            predicted_receiver = None
+            has_valid_kick = False
+            for i in range(3):
+                if agent_actions[i][2] == 1 and getattr(self, '_last_touch_pid', None) == i:
+                    has_valid_kick = True
+                
+            if has_valid_kick:
+                predicted_receiver = self._predict_greedy_receiver()
+                for i in range(3):
+                    if agent_actions[i][2] == 1 and getattr(self, '_last_touch_pid', None) == i and predicted_receiver is not None:
+                        if predicted_receiver == self.agents[i]:
+                            self.marl_self_pass_list[i] = True
+                            self.marl_real_pass_list[i] = False
+                        elif predicted_receiver in self.agents[:3]:
+                            self.marl_self_pass_list[i] = False
+                            self.marl_real_pass_list[i] = True
+                
+            # Global goal logic
+            goal_scored = False
+            if goal_result == 2:
+                self.scores[self.team_id - 1] += 1
+                base_reward = 20.0
+                bonus_pool = 3.0
+                for i in range(3): rew_list[i] += base_reward
+                
+                # Assister bonus
+                for i in range(3):
+                    if i in self.investment_sequence and self.investment_sequence[-1] != i:
+                        seq_idx = self.investment_sequence.index(i)
+                        passes_away = len(self.investment_sequence) - 1 - seq_idx
+                        invest_share = 0.3 * (0.5 ** (passes_away - 1))
+                        rew_list[i] += bonus_pool * invest_share
+                        
+                goal_scored = True
+                terminated = True
+                
+            elif goal_result == 1:
+                self.scores[opp_id - 1] += 1
+                for i in range(3): rew_list[i] -= 20.0
+                goal_scored = True
+                terminated = True
 
-        if not terminated and self.step_count >= self.max_steps:
-            truncated = True
+            if not terminated and self.step_count >= self.max_steps:
+                truncated = True
+                
+            # Per-agent reward evaluation
+            self_pass_list = [False, False, False]
+            for i in range(3):
+                # We skip kick penalty per user feedback
+                
+                # Check pass
+                self_pass = self.marl_self_pass_list[i]
+                real_pass = self.marl_real_pass_list[i]
+                        
+                # Invest share
+                min_share = 0.3 * (0.5 ** 3) # 3 team members
+                invest_share = min_share
+                in_sequence = False
+                if self.investment_sequence:
+                    if self.investment_sequence[-1] == i:
+                        invest_share = 1.0
+                        in_sequence = True
+                    elif i in self.investment_sequence:
+                        seq_idx = self.investment_sequence.index(i)
+                        passes_away = len(self.investment_sequence) - 1 - seq_idx
+                        invest_share = 0.3 * (0.5 ** (passes_away - 1))
+                        in_sequence = True
+                        
+                # Advance / Backward
+                ADVANCE_REWARD = 0.003
+                BACKWARD_PENALTY = 0.003
+                
+                if delta_dist_to_goal > 0:
+                    if has_possession_reward and not is_opp_pass_back:
+                        penalty_mult = 0.333 if is_pass_back else 1.0
+                        mult = 1.0
+                        if real_pass: mult = 1.0
+                        elif self_pass: mult = penalty_mult
+                        elif is_dribbling and agent_actions[i][2] == 0: mult = penalty_mult
+                        rew_list[i] += ADVANCE_REWARD * delta_dist_to_goal * mult * invest_share
+                elif delta_dist_to_goal < 0:
+                    if has_possession_penalty:
+                        mult = 1.0
+                        if is_pass_back: mult = 0.333
+                        
+                        penalty_share = 1.0
+                        if self.last_touch_team != opp_id:
+                            penalty_share = invest_share if in_sequence else 1.0
+                            
+                        rew_list[i] -= BACKWARD_PENALTY * abs(delta_dist_to_goal) * mult * penalty_share
+                        
+                # Turnover Penalty
+                if turnover_penalty < 0.0:
+                    if in_sequence:
+                        rew_list[i] += turnover_penalty * invest_share
+                    else:
+                        rew_list[i] += turnover_penalty * 1.0
+                        
+                # Minor dense reward for ball speed (only early in training)
+                if ts < 3_000_000:
+                    ball_speed = math.hypot(self.ball.xs, self.ball.ys)
+                    if ball_speed > 0.3:
+                        rew_list[i] += 0.001
+            
+            # Update history
+            self._prev_dist_to_ball = math.hypot(self.agents[0].x - self.ball.x, self.agents[0].y - self.ball.y)
+            self._prev_ball_dist_to_goal = _dist_to_goal_segment(self.ball.x, self.ball.y, goal_x, self.goal_y, -self.goal_y)
+            self._prev_ball_x       = self.ball.x
+            self._prev_ball_y       = self.ball.y
+            self._prev_ball_speed   = math.hypot(self.ball.xs, self.ball.ys)
 
-        # Update previous tracking
-        self._prev_dist_to_ball = math.hypot(self.agents[0].x - self.ball.x, self.agents[0].y - self.ball.y)
-        self._prev_ball_dist_to_goal = cur_ball_dist_to_goal
-        self._prev_ball_x       = self.ball.x
-        self._prev_ball_y       = self.ball.y
-        self._prev_ball_speed   = math.hypot(self.ball.xs, self.ball.ys)
+            info = {
+                "marl/sequence_len": len(self.investment_sequence),
+                "marl/dribble_duration": getattr(self, 'dribble_duration', 0.0),
+                "marl/opp_pos_time": float(self.opp_possession_time),
+                "marl/self_pass": list(self.marl_self_pass_list),
+            }
+            obs_list = [self._get_obs(agent_idx=i) for i in range(3)]
+            return obs_list, rew_list, terminated, truncated, [info]*3
 
-        info = {
-            "marl/sequence_len": len(self.investment_sequence),
-            "marl/dribble_duration": float(dribble_duration),
-            "marl/self_pass": int(self.self_pass_active),
-            "marl/opp_pos_time": float(self.opp_possession_time),
-        }
+        else:
+            # ── ORIGINAL REWARD BLOCK FOR A0/A1 ──
+            # Anti-self pass detection on KICK using Greedy Prediction
+            kick = getattr(self, 'last_action_kick', 0)
+            if kick and self.last_touch_team == self.team_id:
+                receiver = self._predict_greedy_receiver()
+                if receiver is self.agents[0]:
+                    self.self_pass_active = True
+                    self.real_pass_active = False
+                else:
+                    self.self_pass_active = False
+                    self.real_pass_active = True
+            self.real_pass_active = False
 
-        return self._get_obs(), float(reward), terminated, truncated, info
+            reward = 0.0
+            dist = math.hypot(self.ball.x - self.agents[0].x, self.ball.y - self.agents[0].y)
+            in_range = dist - self.agents[0].radius - self.ball.radius < KICK_RANGE
+            if self.last_action_kick == 1 and not in_range:
+                reward -= 0.001
+
+            # Determine invest_share for the current agent
+            num_team_members = len(self.agents) // 2 if len(self.agents) > 1 else 1
+            min_share = 0.3 * (0.5 ** num_team_members)
+            invest_share = min_share
+            in_sequence = False
+            if self.investment_sequence:
+                if self.investment_sequence[-1] == 0:
+                    invest_share = 1.0
+                    in_sequence = True
+                elif 0 in self.investment_sequence:
+                    seq_idx = self.investment_sequence.index(0)
+                    passes_away = len(self.investment_sequence) - 1 - seq_idx
+                    invest_share = 0.3 * (0.5 ** (passes_away - 1))
+                    in_sequence = True
+
+            ADVANCE_REWARD = 0.003
+            BACKWARD_PENALTY = 0.003
+            
+            if delta_dist_to_goal > 0: # Ball advanced (good)
+                if has_possession_reward and not is_opp_pass_back:
+                    penalty_mult = 0.333 if is_pass_back else 1.0
+                    mult = 1.0
+                    if self.real_pass_active:
+                        mult = 1.0
+                    elif self.self_pass_active:
+                        mult = penalty_mult
+                    elif is_dribbling and not kick:
+                        mult = penalty_mult
+                    reward += ADVANCE_REWARD * delta_dist_to_goal * mult * invest_share
+                    
+            elif delta_dist_to_goal < 0: # Ball moved back (bad)
+                if has_possession_penalty:
+                    mult = 1.0
+                    if is_pass_back:
+                        mult = 0.333
+                    if self.last_touch_team == opp_id:
+                        penalty_share = 1.0
+                    else:
+                        penalty_share = invest_share if in_sequence else 1.0
+                    reward -= BACKWARD_PENALTY * abs(delta_dist_to_goal) * mult * penalty_share
+
+            if turnover_penalty < 0.0:
+                if in_sequence:
+                    reward += turnover_penalty * invest_share
+                else:
+                    reward += turnover_penalty * 1.0
+
+            goal_scored = False
+            if goal_result == 2:
+                self.scores[self.team_id - 1] += 1
+                base_reward = 10.0
+                bonus_pool = 3.0
+                reward += base_reward
+                if self.investment_sequence and self.investment_sequence[-1] != 0 and 0 in self.investment_sequence:
+                    seq_idx = self.investment_sequence.index(0)
+                    passes_away = len(self.investment_sequence) - 1 - seq_idx
+                    invest_share = 0.3 * (0.5 ** (passes_away - 1))
+                    reward += bonus_pool * invest_share
+                goal_scored = True
+                terminated = True
+                
+            elif goal_result == 1:
+                self.scores[opp_id - 1] += 1
+                reward -= 15.0
+                goal_scored = True
+                terminated = True
+
+            if not terminated and self.step_count >= self.max_steps:
+                truncated = True
+
+            self._prev_dist_to_ball = math.hypot(self.agents[0].x - self.ball.x, self.agents[0].y - self.ball.y)
+            self._prev_ball_dist_to_goal = _dist_to_goal_segment(self.ball.x, self.ball.y, goal_x, self.goal_y, -self.goal_y)
+            self._prev_ball_x       = self.ball.x
+            self._prev_ball_y       = self.ball.y
+            self._prev_ball_speed   = math.hypot(self.ball.xs, self.ball.ys)
+
+            if ts < 3_000_000:
+                ball_speed = math.hypot(self.ball.xs, self.ball.ys)
+                if ball_speed > 0.3:
+                    frozen_reward += 0.001
+                if goal_result == 2:
+                    frozen_reward += 0.001 * (self.max_steps - self.step_count)
+            else:
+                if goal_result == 2:
+                    frozen_reward += 0.02 * (self.max_steps - self.step_count)
+                    
+            if ts >= 3_000_000:
+                reward = frozen_reward
+            else:
+                reward += frozen_reward
+                
+            info = {
+                "marl/sequence_len": len(self.investment_sequence),
+                "marl/dribble_duration": getattr(self, 'dribble_duration', 0.0),
+                "marl/self_pass": int(getattr(self, 'self_pass_active', False)),
+                "marl/opp_pos_time": float(self.opp_possession_time),
+            }
+            return self._get_obs(agent_idx=0), float(reward), terminated, truncated, info
 
 
     # ─── Physics ──────────────────────────────────────────────────────────────
@@ -644,14 +967,34 @@ class HaxballCurriculumEnv(gym.Env):
         agents = self.agents
         HW, HH = self.HW, self.HH
 
-        # Randomize agent action order each tick to prevent systematic first-mover advantage
-        action_order = list(range(len(agent_actions)))
+        action_order = list(range(len(agents)))
         self._rng.shuffle(action_order)
+        
+        if not hasattr(self, 'kick_exhausted') or len(self.kick_exhausted) != len(agents):
+            self.kick_exhausted = [False] * len(agents)
+
+        masked_actions = []
+        for i in range(len(agents)):
+            dx, dy, kick = agent_actions[i]
+            
+            # Reset exhausted state if they release the kick button
+            if kick == 0:
+                self.kick_exhausted[i] = False
+                masked_actions.append((dx, dy, 0))
+            else:
+                # If they press kick, only accept if in range AND not exhausted
+                dist = math.hypot(ball.x - agents[i].x, ball.y - agents[i].y)
+                in_range = dist - agents[i].radius - ball.radius < KICK_RANGE
+                
+                if in_range and not self.kick_exhausted[i]:
+                    masked_actions.append((dx, dy, 1))
+                else:
+                    masked_actions.append((dx, dy, 0))
 
         # 1. Kick (before movement) — random order
         for i in action_order:
             ag = agents[i]
-            dx, dy, kick = agent_actions[i]
+            dx, dy, kick = masked_actions[i]
             if kick:
                 dx_b = ball.x - ag.x
                 dy_b = ball.y - ag.y
@@ -660,13 +1003,19 @@ class HaxballCurriculumEnv(gym.Env):
                     nx, ny = dx_b / dist, dy_b / dist
                     ball.xs += nx * KICK_STR
                     ball.ys += ny * KICK_STR
+                    self.kick_exhausted[i] = True  # Consumed!
+                    
+                    num_per_team = len(agents) // 2 if len(agents) > 1 else 1
+                    team = self.team_id if i < num_per_team else (2 if self.team_id == 1 else 1)
+                    self.touches_this_tick.append((i, team))
 
         # 2. Acceleration — random order
         for i in action_order:
             ag = agents[i]
-            dx, dy, kick = agent_actions[i]
+            dx, dy, _ = masked_actions[i]
+            intent_kick = agent_actions[i][2]
             ln = math.hypot(dx, dy)
-            acc = PLYR_KICK_ACC if kick else PLYR_ACC
+            acc = PLYR_KICK_ACC if intent_kick else PLYR_ACC
             if ln > 0:
                 ndx, ndy = dx / ln, dy / ln
                 ag.xs += ndx * acc
@@ -683,9 +1032,6 @@ class HaxballCurriculumEnv(gym.Env):
         all_discs = [ball] + shuffled_agents
         n = len(all_discs)
         
-        self.last_touch_player_this_tick = None
-        self.last_touch_team_this_tick = None
-        
         for i in range(n):
             for j in range(i + 1, n):
                 collided = _resolve_dd(all_discs[i], all_discs[j])
@@ -696,8 +1042,9 @@ class HaxballCurriculumEnv(gym.Env):
                         # Find index in original self.agents
                         try:
                             orig_idx = self.agents.index(ag_disc)
-                            self.last_touch_player_this_tick = orig_idx
-                            self.last_touch_team_this_tick = self.team_id if orig_idx == 0 else (2 if self.team_id == 1 else 1)
+                            num_per_team = len(self.agents) // 2 if len(self.agents) > 1 else 1
+                            team = self.team_id if orig_idx < num_per_team else (2 if self.team_id == 1 else 1)
+                            self.touches_this_tick.append((orig_idx, team))
                         except ValueError:
                             pass
                             
@@ -769,9 +1116,9 @@ class HaxballCurriculumEnv(gym.Env):
         return 0
 
     # ─── Observation ──────────────────────────────────────────────────────────
-    def _get_obs(self) -> np.ndarray:
+    def _get_obs(self, agent_idx=0) -> np.ndarray:
         ball  = self.ball
-        agent = self.agents[0]
+        agent = self.agents[agent_idx]
         obs   = np.zeros(OBS_DIM, dtype=np.float32)
 
         bx, by   = ball.x,   ball.y
@@ -780,8 +1127,9 @@ class HaxballCurriculumEnv(gym.Env):
         mxs, mys = agent.xs, agent.ys
         flip = self._flip
 
-        surf_dist = max(0.0, math.hypot(mx - bx, my - by) - PLYR_R - BALL_R)
-        can_kick  = 1.0 if surf_dist < KICK_RANGE else 0.0
+        surf_dist_raw = math.hypot(mx - bx, my - by) - PLYR_R - BALL_R
+        surf_dist = max(0.0, surf_dist_raw)
+        dist_diff = surf_dist_raw - KICK_RANGE
 
         i = 0
 
@@ -791,22 +1139,66 @@ class HaxballCurriculumEnv(gym.Env):
         obs[i] = self.HW / NORM;                        i += 1
         obs[i] = 0.0;    i += 1  # 0=RED, 1=BLUE
 
-        # Section 2 — Agent ↔ Ball (4)
+        # Section 2 — Agent ↔ Ball (7)
         obs[i] = flip * (bx - mx) / NORM;     i += 1
         obs[i] = (by - my) / NORM;            i += 1
         obs[i] = surf_dist / DIAG;            i += 1
-        obs[i] = can_kick;                    i += 1
+        obs[i] = dist_diff / DIAG;            i += 1
+        
+        my_dist_to_ball = math.hypot(mx - bx, my - by)
+        
+        # Determine if agent is the closest player on the entire field
+        is_nearest_field = 1.0
+        for ag in self.agents:
+            if ag != agent and math.hypot(ag.x - bx, ag.y - by) < my_dist_to_ball:
+                is_nearest_field = 0.0
+                break
+        obs[i] = is_nearest_field; i += 1
+        
+        # Determine if agent is the closest on their team, and their rank on team
+        my_team_agents = [self.agents[0]]
+        # Because training/env.py places main agent at 0, teammates at 2..N_TM+1 if N_TM>0.
+        # Wait, how are agents ordered? [A0_RED, A0_BLUE, A1_RED, A1_BLUE...] 
+        # Typically agents list is structured based on team. Let's just calculate distances for all team agents.
+        team_dists = []
+        for j, ag in enumerate(self.agents):
+            # Same team if index % 2 == 0 (assuming team 1) vs index % 2 == 1 (team 2),
+            # or based on how env adds them. Let's safely check their intended team.
+            # In self-play, agents[0], agents[2], ... are Red, agents[1], agents[3]... are Blue
+            # Actually, `ag` doesn't have a team attribute directly here. We can just use the index parity.
+            if j % 2 == 0:
+                team_dists.append(math.hypot(ag.x - bx, ag.y - by))
+                
+        team_dists.sort()
+        is_nearest_team = 1.0 if (len(team_dists) > 0 and team_dists[0] >= my_dist_to_ball - 0.001) else 0.0
+        obs[i] = is_nearest_team; i += 1
+        
+        # Rank on team (0 = closest, 1 = second, etc.)
+        rank = 0.0
+        for d in team_dists:
+            if d < my_dist_to_ball - 0.001:
+                rank += 1.0
+        obs[i] = rank; i += 1
 
-        # Section 2b — Ball ↔ Goals (4)
+        # Section 2b — Ball ↔ Goals (8)
         top_post_y = self.goal_center_y - self.goal_y
         bot_post_y = self.goal_center_y + self.goal_y
-        opp_post_y = top_post_y if abs(top_post_y - by) < abs(bot_post_y - by) else bot_post_y
-        own_post_y = opp_post_y
-
+        
+        # Opponent Top Post
         obs[i] = (self.HW - flip * bx) / NORM;       i += 1
-        obs[i] = (opp_post_y - by) / NORM;           i += 1
+        obs[i] = (top_post_y - by) / NORM;           i += 1
+        
+        # Opponent Bottom Post
+        obs[i] = (self.HW - flip * bx) / NORM;       i += 1
+        obs[i] = (bot_post_y - by) / NORM;           i += 1
+
+        # Own Top Post
         obs[i] = (-self.HW - flip * bx) / NORM;      i += 1
-        obs[i] = (own_post_y - by) / NORM;           i += 1
+        obs[i] = (top_post_y - by) / NORM;           i += 1
+        
+        # Own Bottom Post
+        obs[i] = (-self.HW - flip * bx) / NORM;      i += 1
+        obs[i] = (bot_post_y - by) / NORM;           i += 1
 
         # Section 3 — Dynamic state (11)
         obs[i] = flip * bx / NORM;            i += 1
@@ -837,11 +1229,13 @@ class HaxballCurriculumEnv(gym.Env):
             obs[i:i+3] = [0, 0, 1]
         i += 3
         
-        # Possession 0.25s ago (3 dims)
-        pos_0_25 = self.possession_history[0][1] if self.possession_history else None
-        if pos_0_25 is None:
+        # Previous possession among 0.25s (3 dims: None, Team, Opp)
+        # None = continuous hold OR ball was free >0.25s before last touch
+        # Frozen at moment of last touch, not a rolling window
+        _prev_poss_obs = self.prev_poss_at_touch
+        if _prev_poss_obs is None:
             obs[i:i+3] = [1, 0, 0]
-        elif pos_0_25 == self.team_id:
+        elif _prev_poss_obs == self.team_id:
             obs[i:i+3] = [0, 1, 0]
         else:
             obs[i:i+3] = [0, 0, 1]
@@ -875,12 +1269,21 @@ class HaxballCurriculumEnv(gym.Env):
                 return 0.0, 0.0, 0.0, 0.0
             d = math.sqrt(d2)
             L = math.sqrt(d2 - R*R)
-            theta = math.atan2(dy, dx)
+            
+            # Goc quet bat dau tu UP (-y), theo chieu kim dong ho
+            theta = math.atan2(dx, -dy)
             alpha = math.asin(R / d)
-            v1_x = L * math.cos(theta + alpha)
-            v1_y = L * math.sin(theta + alpha)
-            v2_x = L * math.cos(theta - alpha)
-            v2_y = L * math.sin(theta - alpha)
+            
+            # 1. Theo chieu kim dong ho truoc (+ alpha)
+            angle_cw = theta + alpha
+            v1_x = L * math.sin(angle_cw)
+            v1_y = -L * math.cos(angle_cw)
+            
+            # 2. Nguoc chieu kim dong ho sau (- alpha)
+            angle_ccw = theta - alpha
+            v2_x = L * math.sin(angle_ccw)
+            v2_y = -L * math.cos(angle_ccw)
+            
             return flip * v1_x / NORM, v1_y / NORM, flip * v2_x / NORM, v2_y / NORM
 
         # Main agent tangent vectors (4 dims)
@@ -888,37 +1291,56 @@ class HaxballCurriculumEnv(gym.Env):
         obs[i:i+4] = [t_mx1, t_my1, t_mx2, t_my2]
         i += 4
 
-        # Sections 5 & 6 — Teammates × 4 + Opponents × 5
-        # The base code has 9 dims per TM and 9 dims per OPP.
-        # We will append the 4 tangent dims directly after them? No, we should place them systematically.
-        # The easiest is to just leave empty padding or adjust the index.
-        # N_TM * 9 (old) + N_TM * 4 (new)
-        # Wait, the prompt said "boi player, bo sung vector tu bong de tiep diem..."
-        # We'll just write the N_TM and N_OPP loops.
-        # In this 1v1 setup, no teammates.
+        num_per_team = 3 if getattr(self, 'phase', '') == 'A3' else 1
         
-        # Teammates (each takes 14 dims: 9 base + 4 tangent + 1 share)
-        for tm_i in range(N_TM):
-            idx = i + tm_i * 14
-            # Agent indexes are 0 (main), 1 to N_TM (teammates)
-            tm_agent_idx = tm_i + 1
+        # Teammates
+        tm_count = 0
+        for j in range(num_per_team):
+            if j == agent_idx: continue
+            if tm_count >= N_TM: break
+            
+            tm = self.agents[j]
+            idx = i + tm_count * 14
+            
+            obs[idx] = flip * tm.x / NORM;                 idx += 1
+            obs[idx] = tm.y / NORM;                        idx += 1
+            obs[idx] = flip * tm.xs / MAX_SPEED;           idx += 1
+            obs[idx] = tm.ys / MAX_SPEED;                  idx += 1
+            
+            obs[idx] = flip * (tm.x - mx) / NORM;          idx += 1
+            obs[idx] = (tm.y - my) / NORM;                 idx += 1
+            
+            obs[idx] = flip * (bx - tm.x) / NORM;          idx += 1
+            obs[idx] = (by - tm.y) / NORM;                 idx += 1
+            
+            tm_surf_dist = max(0.0, math.hypot(tm.x - bx, tm.y - by) - PLYR_R - BALL_R)
+            obs[idx] = tm_surf_dist / DIAG;                idx += 1
+            
+            t_tx1, t_ty1, t_tx2, t_ty2 = _get_tangent_vectors(tm.x, tm.y)
+            obs[idx:idx+4] = [t_tx1, t_ty1, t_tx2, t_ty2]; idx += 4
+
             share = 0.0
             if self.investment_sequence:
-                if self.investment_sequence[-1] == tm_agent_idx:
-                    share = 1.0  # Holder
-                elif tm_agent_idx in self.investment_sequence:
-                    seq_idx = self.investment_sequence.index(tm_agent_idx)
+                tm_idx = self.agents.index(tm)
+                if self.investment_sequence[-1] == tm_idx:
+                    share = 1.0
+                elif tm_idx in self.investment_sequence:
+                    seq_idx = self.investment_sequence.index(tm_idx)
                     passes_away = len(self.investment_sequence) - 1 - seq_idx
                     share = 0.3 * (0.5 ** (passes_away - 1))
             
-            # Since we have no teammates in 1v1 currently, we just leave the base 14 dims as 0
-            # If we had teammates, we would populate obs[idx:idx+14] here.
-            obs[idx + 13] = share  # the 14th dimension
+            obs[idx] = share; idx += 1
+            tm_count += 1
+            
         i += N_TM * 14
 
-        if len(self.agents) > 1:
-            opp = self.agents[1]
-            idx = i
+        # Opponents
+        opp_count = 0
+        for j in range(num_per_team, len(self.agents)):
+            if opp_count >= N_OPP: break
+            
+            opp = self.agents[j]
+            idx = i + opp_count * 13
             
             obs[idx] = flip * opp.x / NORM;                 idx += 1
             obs[idx] = opp.y / NORM;                        idx += 1
@@ -936,13 +1358,15 @@ class HaxballCurriculumEnv(gym.Env):
             
             t_ox1, t_oy1, t_ox2, t_oy2 = _get_tangent_vectors(opp.x, opp.y)
             obs[idx:idx+4] = [t_ox1, t_oy1, t_ox2, t_oy2]; idx += 4
+            
+            opp_count += 1
 
         i += N_OPP * 13
 
         return obs
 
 
-    def _get_obs_for_opponent(self) -> np.ndarray:
+    def _get_obs_for_opponent(self, opp_idx=0) -> np.ndarray:
         # Swap team context and return obs to opponent (for self play evaluation inside step)
         original_team = self.team_id
         # Swap explicitly
@@ -953,25 +1377,28 @@ class HaxballCurriculumEnv(gym.Env):
         self._flip = 1.0 if self.team_id == 1 else -1.0
         self._attack_sign = 1 if self.team_id == 1 else -1
         
-        # We also need to swap agents[0] and agents[1] for the perspective of `_get_obs`
-        self.agents[0], self.agents[1] = self.agents[1], self.agents[0]
+        # We also need to swap agents for the perspective of `_get_obs`
+        num_per_team = 3 if getattr(self, 'phase', '') == 'A3' else 1
+        team1 = self.agents[:num_per_team]
+        team2 = self.agents[num_per_team:num_per_team*2]
+        self.agents = team2 + team1 + self.agents[num_per_team*2:]
         
-        obs_opp = self._get_obs()
+        obs_opp = self._get_obs(agent_idx=opp_idx)
         
         # Revert
-        self.agents[0], self.agents[1] = self.agents[1], self.agents[0]
+        self.agents = team1 + team2 + self.agents[num_per_team*2:]
         self.team_id = original_team
         self._flip = old_flip
         self._attack_sign = old_attack
         return obs_opp
 
-    def _get_follower_action(self):
+    def _get_follower_action(self, ag):
         """Chase ball and kick toward opponent goal.
         Anti-own-goal: simulate ball trajectory after kick (ray-goal intersection).
         - If kick would enter own goal → suppress + reposition laterally.
         - Otherwise → kick freely regardless of distance.
         """
-        ag = self.agents[1]
+        b  = self.ball
         b  = self.ball
 
         own_goal_x   = self.HW * self._attack_sign
@@ -1029,12 +1456,12 @@ class HaxballCurriculumEnv(gym.Env):
         out_dx, out_dy = DIR_MAP[best_dir_idx]
         return (out_dx, out_dy, kick)
 
-    def _get_attacker_action(self):
+    def _get_attacker_action(self, ag):
         """Aggressively tries to score into agent's goal.
         Positions behind the ball (own-goal side) so kicks go toward agent's goal.
         Has anti-own-goal ray test: never kicks into own goal.
         """
-        ag = self.agents[1]
+        b  = self.ball
         b  = self.ball
 
         own_goal_x   = self.HW * self._attack_sign   # follower's own goal
@@ -1125,32 +1552,36 @@ class HaxballCurriculumEnv(gym.Env):
         dx, dy = DIR_MAP[dir_idx]
         return (dx, dy, kick)
 
-    def _get_pazzo_action(self):
+    def _get_pazzo_action(self, ag, opp_i):
         """PazzoModel: Moves to a random point, changes every rand[100,150] steps. Jitters if ball is near center."""
-        ag = self.agents[1]
         b = self.ball
 
         if not hasattr(self, '_pazzo_steps'):
-            self._pazzo_steps = 0
-            self._pazzo_target = None
-            self._pazzo_interval = int(self._rng.integers(100, 151))
+            self._pazzo_steps = {}
+            self._pazzo_target = {}
+            self._pazzo_interval = {}
+            
+        if opp_i not in self._pazzo_steps:
+            self._pazzo_steps[opp_i] = 0
+            self._pazzo_target[opp_i] = None
+            self._pazzo_interval[opp_i] = int(self._rng.integers(100, 151))
 
-        self._pazzo_steps += 1
+        self._pazzo_steps[opp_i] += 1
 
-        if self._pazzo_target is None or self._pazzo_steps > self._pazzo_interval:
-            self._pazzo_target = (
+        if self._pazzo_target[opp_i] is None or self._pazzo_steps[opp_i] > self._pazzo_interval[opp_i]:
+            self._pazzo_target[opp_i] = (
                 self._rng.uniform(-self.HW, self.HW),
                 self._rng.uniform(-self.HH, self.HH)
             )
-            self._pazzo_steps = 0
-            self._pazzo_interval = int(self._rng.integers(100, 151))
+            self._pazzo_steps[opp_i] = 0
+            self._pazzo_interval[opp_i] = int(self._rng.integers(100, 151))
 
         # Nếu bóng ở trung tâm: jitter ngẫu nhiên ngắm mục tiêu
         if abs(b.x) < 5.0 and abs(b.y) < 5.0 and math.hypot(b.xs, b.ys) < 0.5:
             target_x = self._rng.uniform(-150.0, 150.0)
             target_y = self._rng.uniform(-150.0, 150.0)
         else:
-            target_x, target_y = self._pazzo_target
+            target_x, target_y = self._pazzo_target[opp_i]
 
         comp_x = target_x - ag.x
         comp_y = target_y - ag.y
@@ -1171,10 +1602,9 @@ class HaxballCurriculumEnv(gym.Env):
 
         return (hor, ver, 0)
 
-    def _get_wanderer_action(self):
+    def _get_wanderer_action(self, ag, opp_i):
         """WandererBot: every rand[3,12] steps picks a point within radius 30 of the ball
         and moves toward it. Kicks ~30% when in range."""
-        ag = self.agents[1]
         b  = self.ball
 
         dist_to_ball = math.hypot(b.x - ag.x, b.y - ag.y)
@@ -1182,14 +1612,19 @@ class HaxballCurriculumEnv(gym.Env):
 
         # Initialise persistent state
         if not hasattr(self, '_wanderer_steps'):
-            self._wanderer_steps = 0
-            self._wanderer_interval = int(self._rng.integers(1, 4))
-            self._wanderer_target = (b.x, b.y)
+            self._wanderer_steps = {}
+            self._wanderer_interval = {}
+            self._wanderer_target = {}
+            
+        if opp_i not in self._wanderer_steps:
+            self._wanderer_steps[opp_i] = 0
+            self._wanderer_interval[opp_i] = int(self._rng.integers(1, 4))
+            self._wanderer_target[opp_i] = (b.x, b.y)
 
-        self._wanderer_steps += 1
+        self._wanderer_steps[opp_i] += 1
 
         # Pick a new target every rand[3,12] steps
-        if self._wanderer_steps >= self._wanderer_interval:
+        if self._wanderer_steps[opp_i] >= self._wanderer_interval[opp_i]:
             angle = float(self._rng.uniform(0, 2 * math.pi))
             r     = float(self._rng.uniform(0, 60.0))
             tx = b.x + r * math.cos(angle)
@@ -1197,11 +1632,11 @@ class HaxballCurriculumEnv(gym.Env):
             # Clamp inside field
             tx = max(-self.HW + PLYR_R, min(self.HW - PLYR_R, tx))
             ty = max(-self.HH + PLYR_R, min(self.HH - PLYR_R, ty))
-            self._wanderer_target = (tx, ty)
-            self._wanderer_steps = 0
-            self._wanderer_interval = int(self._rng.integers(1, 4))
+            self._wanderer_target[opp_i] = (tx, ty)
+            self._wanderer_steps[opp_i] = 0
+            self._wanderer_interval[opp_i] = int(self._rng.integers(1, 4))
 
-        target_x, target_y = self._wanderer_target
+        target_x, target_y = self._wanderer_target[opp_i]
         dx = target_x - ag.x
         dy = target_y - ag.y
         dist = math.hypot(dx, dy)
@@ -1222,9 +1657,10 @@ class HaxballCurriculumEnv(gym.Env):
 
         return (hor, ver, kick)
 
-    def _get_defender_action(self):
-        # Stay near goal, intercept if ball comes near
-        ag = self.agents[1]
+    def _get_defender_action(self, ag):
+        """Block the direct line between ball and defender's own goal center.
+        Retreats to defensive line when ball is far.
+        """
         b = self.ball
         
         # Opponent's goal x coordinate (they defend this)
@@ -1263,6 +1699,19 @@ class HaxballCurriculumEnv(gym.Env):
     def render(self):
         pass
 
+    def action_masks(self) -> np.ndarray:
+        """
+        Returns a 1D boolean array of shape (11,) for MultiDiscrete([9, 2]).
+        Masks out the kick action (index 10) if the ball is out of range.
+        """
+        agent = self.agents[0]
+        bx, by = self.ball.x, self.ball.y
+        dist_diff = math.hypot(agent.x - bx, agent.y - by) - PLYR_R - BALL_R - KICK_RANGE
+        can_kick = dist_diff <= 0
+        
+        mask = np.ones(11, dtype=bool)
+        mask[10] = can_kick
+        return mask
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Standalone physics helper (module-level for speed)
