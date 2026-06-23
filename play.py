@@ -23,17 +23,34 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH      = "models/a1_fix_checkpoints/snapshot_2000000.zip"  # Agent chính
-OPPONENT_MODEL_PATH = "models/a1_checkpoints/snapshot_21000000.zip" # Opponent model (dùng khi OPPONENT='Trained')
-A0_MODEL_PATH = None
+MODE = "A2v1"                           # "A1" | "A2v1"
+PLAY_AS = "T1"                          # For A2v1: 'T1' (Play as Team 1 - 2 players), 'T2' (Play as Team 2 - 1 player)
+
+# A1 configs
+A1_MODEL_PATH      = "models/a1_fix_checkpoints/snapshot_2000000.zip"  # Agent chính (A1)
+A1_OPP_MODEL_PATH  = "models/a1_checkpoints/snapshot_6000000.zip"      # Opponent model (A1)
+
+# A2v1 configs
+A2_T1_MODEL_PATH   = r"models\a2_t1_checkpoints\snapshot_1000000.zip"
+A2_T2_MODEL_PATH   = r"models\a2_t2_checkpoints\snapshot_1000000.zip"
+A2_BASE_MODEL_PATH = "models/a2_base.zip" # Fallback if training not complete
+
 OPPONENT = "Trained"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
 GOAL_SIZE = 64.0                        # Goal half-height in physics units
 DETERMINISTIC = True                    # Use deterministic policy actions
 
 # Display labels (auto-derived from model paths)
 _stem = lambda p: os.path.splitext(os.path.basename(p))[0] if p else None
-AGENT_LABEL = _stem(A1_MODEL_PATH)   or "A1"
-OPP_LABEL   = _stem(OPPONENT_MODEL_PATH) or "OPP"
+if MODE == "A1":
+    AGENT_LABEL = _stem(A1_MODEL_PATH) or "A1"
+    OPP_LABEL   = _stem(A1_OPP_MODEL_PATH) or "OPP"
+else:
+    if PLAY_AS == "T1":
+        AGENT_LABEL = "A2_T1"
+        OPP_LABEL = "A2_T2"
+    else:
+        AGENT_LABEL = "A2_T2"
+        OPP_LABEL = "A2_T1"
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
@@ -49,7 +66,11 @@ class PlayFixEnv(HaxballCurriculumEnv):
     def _reset_positions(self):
         super()._reset_positions()
         
-        # 100% Own goal situation
+        # In A2v1, just use the parent's default positioning (random across full half)
+        if self.phase == 'A2.0':
+            return
+            
+        # 100% Own goal situation (A1 only)
         own_goal_x = -self.HW * self._attack_sign
         own_goal_y = float(self._rng.uniform(-self.goal_y, self.goal_y))
         
@@ -82,24 +103,18 @@ class PlayFixEnv(HaxballCurriculumEnv):
         
         self.ball = Disc(bx, by, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
         
-        if self.team_id == 1:
-            self.agents = [
-                Disc(ax, ay, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP),
-                Disc(ox, oy, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)
-            ]
-        else:
-            self.agents = [
-                Disc(ax, ay, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP),
-                Disc(ox, oy, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)
-            ]
+        self.agents = [
+            Disc(ax, ay, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP),
+            Disc(ox, oy, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)
+        ]
 
     def step(self, action):
         obs, reward, terminated, truncated, info = super().step(action)
         
         if terminated or truncated:
             agent_score = self.scores[self.team_id - 1]
-            # Reduce goal reward from 30 to 10
-            if agent_score > 0:
+            # Reduce goal reward from 30 to 10 for A1
+            if agent_score > 0 and self.phase == 'A1':
                 reward -= 20.0
                 
         return obs, reward, terminated, truncated, info
@@ -220,7 +235,12 @@ def draw_players(screen, env, surf_rect):
             # Agent: determine colour by team
             color = C_AGENT if env.team_id == 1 else C_OPP
             label = AGENT_LABEL
+        elif env.phase == 'A2.0' and env.n_agents == 2 and i == 1:
+            # Teammate
+            color = C_AGENT if env.team_id == 1 else C_OPP
+            label = "TM"
         else:
+            # Opponent
             color = C_OPP if env.team_id == 1 else C_AGENT
             label = OPP_LABEL if env.opponent_type == 'Trained' else (env.opponent_type[:3] if env.opponent_type else "BOT")
 
@@ -343,21 +363,47 @@ def main():
     except Exception:
         pass
 
-    print(f"Loading model: {A1_MODEL_PATH}")
-    a1_model = PPO.load(A1_MODEL_PATH, device="cpu")
+    if MODE == "A1":
+        print(f"Loading model: {A1_MODEL_PATH}")
+        main_model = PPO.load(A1_MODEL_PATH, device="cpu")
+        env = PlayFixEnv(phase="A1")
+        
+        if OPPONENT.lower() == "trained" and A1_OPP_MODEL_PATH:
+            print(f"Loading opponent model: {A1_OPP_MODEL_PATH}")
+            env.opponent_policy = PPO.load(A1_OPP_MODEL_PATH, device="cpu")
+            
+    else: # A2v1
+        n_agents = 2 if PLAY_AS == "T1" else 1
+        env = PlayFixEnv(phase="A2.0", n_agents=n_agents)
+        
+        agent_path = A2_T1_MODEL_PATH if PLAY_AS == "T1" else A2_T2_MODEL_PATH
+        opp_path   = A2_T2_MODEL_PATH if PLAY_AS == "T1" else A2_T1_MODEL_PATH
+        
+        if not os.path.exists(agent_path):
+            print(f"WARNING: {agent_path} not found. Falling back to base model {A2_BASE_MODEL_PATH}")
+            agent_path = A2_BASE_MODEL_PATH
+        if not os.path.exists(opp_path):
+            print(f"WARNING: {opp_path} not found. Falling back to base model {A2_BASE_MODEL_PATH}")
+            opp_path = A2_BASE_MODEL_PATH
+            
+        print(f"Loading main agent model: {agent_path}")
+        main_model = PPO.load(agent_path, device="cpu")
+        
+        if n_agents == 2:
+            env.teammate_policy = main_model
+            
+        if OPPONENT.lower() == "trained":
+            print(f"Loading opponent model: {opp_path}")
+            env.opponent_policy = PPO.load(opp_path, device="cpu")
 
     pygame.init()
     screen = pygame.display.set_mode((WIN_W, WIN_H))
-    pygame.display.set_caption("Haxball — A0.1 Play")
+    pygame.display.set_caption(f"Haxball — {MODE} Play")
     clock = pygame.time.Clock()
     init_fonts()
 
     # Field surface rect (below panel, with 5px margin)
     field_rect = pygame.Rect(5, PANEL_H + 5, WIN_W - 10, FIELD_H)
-
-    env = PlayFixEnv(phase="A1")
-    if A0_MODEL_PATH:
-        env.a0_model_path = A0_MODEL_PATH
 
     # ── Set forced_opponent_type BEFORE first reset so it sticks every episode ─
     if OPPONENT:
@@ -366,11 +412,6 @@ def main():
             env.forced_opponent_type = "Human"
         elif opp_lower not in ("random", "none", "solo"):
             env.forced_opponent_type = OPPONENT
-
-    # ── Load opponent policy if Trained ──────────────────────────────────────
-    if OPPONENT.lower() == "trained" and OPPONENT_MODEL_PATH:
-        print(f"Loading opponent model: {OPPONENT_MODEL_PATH}")
-        env.opponent_policy = PPO.load(OPPONENT_MODEL_PATH, device="cpu")
 
     is_human_opp = OPPONENT and OPPONENT.lower() == "human"
 
@@ -448,7 +489,10 @@ def main():
                     flash_until   = 0.0
                     waiting_reset = False
                     last_step_t   = time.time()
-
+                elif event.key == pygame.K_1:
+                    print("Switching mode to A1")
+                    sys.argv = [sys.argv[0]] # we could implement dynamic mode switch but simpler to just edit config
+                
         if not running:
             break
 
@@ -490,7 +534,7 @@ def main():
         if now - last_step_t >= STEP_INTERVAL:
             if is_human_opp:
                 env.human_opponent_action = get_human_action()
-            action, _ = a1_model.predict(obs, deterministic=DETERMINISTIC)
+            action, _ = main_model.predict(obs, deterministic=DETERMINISTIC)
             obs, reward, terminated, truncated, _ = env.step(action)
             step_reward = reward
             ep_reward  += reward

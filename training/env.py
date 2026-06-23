@@ -67,7 +67,7 @@ MAX_SPEED = 10.0
 DIAG      = math.sqrt(NORM ** 2 + NORM ** 2)   # ≈ 1131.4
 N_TM      = 4   # max teammate slots
 N_OPP     = 5   # max opponent slots
-OBS_DIM   = 4 + 4 + 4 + 11 + 2 + N_TM * 9 + N_OPP * 9   # = 106
+OBS_DIM   = 4 + 4 + 4 + 11 + 2 + N_TM * 9 + N_OPP * 9 + 2 + N_TM + 3 # = 115 (added nearest tm dist)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Training meta-constants
@@ -259,6 +259,12 @@ class HaxballCurriculumEnv(gym.Env):
 
         return self._get_obs(), {}
 
+    def _get_num_opp_bypassed(self):
+        if not self.agents: return 0
+        atk = self._attack_sign
+        opps = self.agents[self.n_agents:]
+        return sum(1 for opp in opps if (self.ball.x - opp.x) * atk > 0)
+
     def _reset_positions(self):
         size_class = '1v1'
         cands = [p for p in MAP_PRESETS if p[3] == size_class] or MAP_PRESETS
@@ -440,6 +446,38 @@ class HaxballCurriculumEnv(gym.Env):
                     by = float(self._rng.uniform(-self.HH + BALL_R, self.HH - BALL_R))
                     self.ball = Disc(bx, by, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
                     
+                elif self.phase == 'A2.0':
+                    self.episode_type = 'opponent'
+                    self.goal_y = 64.0
+                    self.opponent_type = 'Trained' if self.forced_opponent_type is None else self.forced_opponent_type
+                    
+                    our_sign = self._attack_sign
+                    our_x_min = -self.HW * 0.85 + PLYR_R if our_sign == 1 else PLYR_R
+                    our_x_max = -PLYR_R if our_sign == 1 else self.HW * 0.85 - PLYR_R
+                    
+                    opp_x_min = PLYR_R if our_sign == 1 else -self.HW * 0.85 + PLYR_R
+                    opp_x_max = self.HW * 0.85 - PLYR_R if our_sign == 1 else -PLYR_R
+
+                    self.ball = Disc(float(self._rng.uniform(-self.HW + BALL_R, self.HW - BALL_R)),
+                                     float(self._rng.uniform(-self.HH + BALL_R, self.HH - BALL_R)),
+                                     0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
+                    self.agents = []
+                    
+                    if self.n_agents == 2:
+                        pos = self._safe_spawn(x_min=our_x_min, x_max=our_x_max)
+                        self.agents.append(Disc(pos[0], pos[1], 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                        pos = self._safe_spawn(x_min=our_x_min, x_max=our_x_max)
+                        self.agents.append(Disc(pos[0], pos[1], 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                        pos = self._safe_spawn(x_min=opp_x_min, x_max=opp_x_max)
+                        self.agents.append(Disc(pos[0], pos[1], 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                    else:
+                        pos = self._safe_spawn(x_min=our_x_min, x_max=our_x_max)
+                        self.agents.append(Disc(pos[0], pos[1], 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                        pos = self._safe_spawn(x_min=opp_x_min, x_max=opp_x_max)
+                        self.agents.append(Disc(pos[0], pos[1], 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                        pos = self._safe_spawn(x_min=opp_x_min, x_max=opp_x_max)
+                        self.agents.append(Disc(pos[0], pos[1], 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP))
+                        
                 else:
                     self.ball = Disc(0.0, 0.0, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
                     
@@ -470,6 +508,9 @@ class HaxballCurriculumEnv(gym.Env):
                     else:
                         self.agents.append(Disc(blue_x, y2, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Agent (BLUE)
                         self.agents.append(Disc(red_x, y1, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)) # Opp (RED)
+
+        if self.phase.startswith('A2'):
+            self.a2_adv = 0
 
     def _safe_spawn(self, max_tries: int = 80, x_min: float = None, x_max: float = None):
         """Return (x, y) not overlapping ball or already-placed agents.
@@ -512,46 +553,93 @@ class HaxballCurriculumEnv(gym.Env):
         
         agent_actions = [(dx * self._flip, dy, kick)]
         
-        # In A1/A1.2/A0.1, we have an opponent. Determine their action.
-        if self.phase in ('A1', 'A1.2', 'A0.1') and len(self.agents) > 1:
-            if self.opponent_type == 'Defender':
-                agent_actions.append(self._get_defender_action())
-            elif self.opponent_type == 'Attacker':
-                agent_actions.append(self._get_attacker_action())
-            elif self.opponent_type == 'Hybrid':
-                # Switch mode based on who last touched the ball
-                if self.last_touch == 'A':   # agent has ball → defend
-                    self._hybrid_mode = 'defender'
-                elif self.last_touch == 'O': # opponent touched ball → press
-                    self._hybrid_mode = 'follower'
-                if self._hybrid_mode == 'defender':
-                    agent_actions.append(self._get_defender_action())
+        # In A1/A1.2/A0.1/A2.0, we have an opponent. Determine their action.
+        if self.phase in ('A1', 'A1.2', 'A0.1', 'A2.0') and len(self.agents) > 1:
+            if self.phase == 'A2.0':
+                if self.n_agents == 2:
+                    # Teammate (agents[1])
+                    if hasattr(self, 'teammate_policy') and self.teammate_policy is not None:
+                        tm_obs = self._get_obs_for_teammate()
+                        expected_shape = self.teammate_policy.observation_space.shape[0]
+                        tm_action, _ = self.teammate_policy.predict(tm_obs[:expected_shape], deterministic=False)
+                        tm_dx, tm_dy = DIR_MAP[int(tm_action[0])]
+                        agent_actions.append((tm_dx * self._flip, tm_dy, int(tm_action[1])))
+                    else:
+                        agent_actions.append((0.0, 0.0, 0))
+                        
+                    # Opponent (agents[2])
+                    if self.opponent_type == 'Human':
+                        agent_actions.append(self.human_opponent_action)
+                    elif self.opponent_policy is not None:
+                        opp_obs = self._get_obs_for_opponent(opp_idx=2)
+                        expected_shape = self.opponent_policy.observation_space.shape[0]
+                        opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=False)
+                        opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
+                        agent_actions.append((opp_dx * (-self._flip), opp_dy, int(opp_action[1])))
+                    else:
+                        agent_actions.append((0.0, 0.0, 0))
                 else:
-                    agent_actions.append(self._get_follower_action())
-            elif self.opponent_type == 'Trained' and self.opponent_policy is not None:
-                # Build obs from opponent's perspective
-                opp_obs = self._get_obs_for_opponent()
-                opp_action, _ = self.opponent_policy.predict(opp_obs, deterministic=False)
-                opp_dir_idx = int(opp_action[0])
-                opp_kick = int(opp_action[1])
-                opp_dx, opp_dy = DIR_MAP[opp_dir_idx]
-                
-                # The network output is relative to the opponent's perspective.
-                # Since the learning agent uses self._flip, the opponent uses -self._flip
-                opp_flip = -self._flip
-                agent_actions.append((opp_dx * opp_flip, opp_dy, opp_kick))
-            elif self.opponent_type == 'Human':
-                agent_actions.append(self.human_opponent_action)
-            elif self.opponent_type == 'Static':
-                agent_actions.append(self._get_static_action())
-            elif self.opponent_type == 'Random':
-                agent_actions.append(self._get_random_action())
-            elif self.opponent_type == 'Pazzo':
-                agent_actions.append(self._get_pazzo_action())
-            elif self.opponent_type == 'Wanderer':
-                agent_actions.append(self._get_wanderer_action())
+                    # Opponent 1 (agents[1])
+                    if self.opponent_type == 'Human':
+                        agent_actions.append(self.human_opponent_action)
+                    elif self.opponent_policy is not None:
+                        opp_obs = self._get_obs_for_opponent(opp_idx=1)
+                        expected_shape = self.opponent_policy.observation_space.shape[0]
+                        opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=False)
+                        opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
+                        agent_actions.append((opp_dx * (-self._flip), opp_dy, int(opp_action[1])))
+                    else:
+                        agent_actions.append((0.0, 0.0, 0))
+                        
+                    # Opponent 2 (agents[2])
+                    if self.opponent_policy is not None:
+                        opp_obs = self._get_obs_for_opponent(opp_idx=2)
+                        expected_shape = self.opponent_policy.observation_space.shape[0]
+                        opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=False)
+                        opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
+                        agent_actions.append((opp_dx * (-self._flip), opp_dy, int(opp_action[1])))
+                    else:
+                        agent_actions.append((0.0, 0.0, 0))
             else:
-                agent_actions.append((0.0, 0.0, 0)) # Default/None
+                if self.opponent_type == 'Defender':
+                    agent_actions.append(self._get_defender_action())
+                elif self.opponent_type == 'Attacker':
+                    agent_actions.append(self._get_attacker_action())
+                elif self.opponent_type == 'Hybrid':
+                    # Switch mode based on who last touched the ball
+                    if self.last_touch == 'A':   # agent has ball → defend
+                        self._hybrid_mode = 'defender'
+                    elif self.last_touch == 'O': # opponent touched ball → press
+                        self._hybrid_mode = 'follower'
+                    if self._hybrid_mode == 'defender':
+                        agent_actions.append(self._get_defender_action())
+                    else:
+                        agent_actions.append(self._get_follower_action())
+                elif self.opponent_type == 'Trained' and self.opponent_policy is not None:
+                    # Build obs from opponent's perspective
+                    opp_obs = self._get_obs_for_opponent()
+                    expected_shape = self.opponent_policy.observation_space.shape[0]
+                    opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=False)
+                    opp_dir_idx = int(opp_action[0])
+                    opp_kick = int(opp_action[1])
+                    opp_dx, opp_dy = DIR_MAP[opp_dir_idx]
+                    
+                    # The network output is relative to the opponent's perspective.
+                    # Since the learning agent uses self._flip, the opponent uses -self._flip
+                    opp_flip = -self._flip
+                    agent_actions.append((opp_dx * opp_flip, opp_dy, opp_kick))
+                elif self.opponent_type == 'Human':
+                    agent_actions.append(self.human_opponent_action)
+                elif self.opponent_type == 'Static':
+                    agent_actions.append(self._get_static_action())
+                elif self.opponent_type == 'Random':
+                    agent_actions.append(self._get_random_action())
+                elif self.opponent_type == 'Pazzo':
+                    agent_actions.append(self._get_pazzo_action())
+                elif self.opponent_type == 'Wanderer':
+                    agent_actions.append(self._get_wanderer_action())
+                else:
+                    agent_actions.append((0.0, 0.0, 0)) # Default/None
 
         # Run self.frame_skip ticks
         goal_result = 0   # 0=none, 1=left(own for red), 2=right(scored for red)
@@ -561,9 +649,12 @@ class HaxballCurriculumEnv(gym.Env):
         
         for _ in range(self.frame_skip):
             self.last_touch_this_tick = None
+            self.last_touch_idx_this_tick = None
             result = self._tick(agent_actions)
             if self.last_touch_this_tick is not None:
                 touch_events.append(self.last_touch_this_tick)
+                if hasattr(self, 'last_touch_idx_this_tick') and self.last_touch_idx_this_tick is not None:
+                    self.last_touch_idx = self.last_touch_idx_this_tick
                 
             if result != 0:
                 goal_result = result
@@ -602,7 +693,7 @@ class HaxballCurriculumEnv(gym.Env):
             if not terminated and self.step_count >= self.max_steps:
                 truncated = True
 
-        else: # A1 or A1.2 Phase
+        elif not self.phase.startswith('A2'): # A1, A1.2, or A0.1 Phase
             # Goal logic
             goal_scored = False
             if goal_result == 2:
@@ -633,13 +724,6 @@ class HaxballCurriculumEnv(gym.Env):
                 # Penalty khi đứng xa bóng với slope = 2
                 dist_penalty = (cur_dist / field_diag) * 2.0
                 reward -= dist_penalty
-
-            # Check if someone won (1 goal = end)
-            if self.scores[0] >= 1 or self.scores[1] >= 1:
-                terminated = True
-                
-            if not terminated and self.step_count >= self.max_steps:
-                truncated = True
                 
             if self.phase == 'A0.1':
                 # ── Reset reward and re-apply terminal signals cleanly ─────────
@@ -650,15 +734,56 @@ class HaxballCurriculumEnv(gym.Env):
                     # If opponent scored into their own goal (last_touch == 'O'), no bonus.
                     if self.last_touch != 'O':
                         reward += 5.0
-                    terminated = True
                 elif goal_result == 1:
                     # Opponent scored — re-apply penalty (was cleared by reset above)
                     reward -= 5.0
-                    terminated = True
 
-                # Terminal at timeout
-                if self.step_count >= self.max_steps:
-                    truncated = True
+        elif self.phase.startswith('A2'):
+            N = self._get_num_opp_bypassed()
+            A = self.a2_adv
+            touched_by_us = ('A' in touch_events)
+            
+            if N > A:
+                if touched_by_us:
+                    reward += (N - A) * 2.0
+                    self.a2_adv = N
+            elif N < A:
+                reward += (N - A) * 2.0
+                self.a2_adv = N
+                
+            # ── Teammate Distance Reward ───────────────────────────────────
+            if self.n_agents == 2:
+                dist_teammates = math.hypot(self.agents[0].x - self.agents[1].x, self.agents[0].y - self.agents[1].y)
+                if dist_teammates > 80.0:
+                    reward += 0.002
+                    
+            # ── Goal Logic ────────────────────────────────────────────────
+            if goal_result == 2: # Agent scored
+                self.scores[self.team_id - 1] += 1
+                time_bonus = 0.002 * max(0, self.max_steps - self.step_count)
+                if self.n_agents == 2:
+                    reward += 10.0 + time_bonus
+                else:
+                    reward += 30.0 + time_bonus
+                goal_scored = True
+                self._reset_positions()
+                
+            elif goal_result == 1: # Opponent scored
+                opp_id = 2 if self.team_id == 1 else 1
+                self.scores[opp_id - 1] += 1
+                
+                if self.n_agents == 2:
+                    # Own goal by teammate? (orig_idx == 1)
+                    last_idx = getattr(self, 'last_touch_idx', None)
+                    if last_idx == 1:
+                        reward -= 10.0
+                    else:
+                        reward -= 25.0
+                else:
+                    reward -= 10.0
+                    
+                goal_scored = True
+                self._reset_positions()
 
         # Update previous tracking
         self._prev_dist_to_ball = math.hypot(a.x - self.ball.x, a.y - self.ball.y)
@@ -668,6 +793,14 @@ class HaxballCurriculumEnv(gym.Env):
             goal_x, self.goal_y, -self.goal_y
         )
         self._prev_ball_speed = math.hypot(self.ball.xs, self.ball.ys)
+
+        # ── Global Terminal Logic ──────────────────────────────────────────────
+        if self.phase != 'A0':
+            if self.scores[0] >= 1 or self.scores[1] >= 1:
+                terminated = True
+                
+        if not terminated and self.step_count >= self.max_steps:
+            truncated = True
 
         info = {
             "a0_1/ball_to_goal_record_reward_total": float(self._a0_1_record_ball_to_goal_reward_total),
@@ -693,6 +826,7 @@ class HaxballCurriculumEnv(gym.Env):
         self._rng.shuffle(action_order)
 
         # 1. Kick (before movement) — random order
+        kicked_agents = []
         for i in action_order:
             ag = agents[i]
             dx, dy, kick = agent_actions[i]
@@ -704,6 +838,7 @@ class HaxballCurriculumEnv(gym.Env):
                     nx, ny = dx_b / dist, dy_b / dist
                     ball.xs += nx * KICK_STR
                     ball.ys += ny * KICK_STR
+                    kicked_agents.append(i)
 
         # 2. Acceleration — random order
         for i in action_order:
@@ -731,22 +866,37 @@ class HaxballCurriculumEnv(gym.Env):
         # Track touches in this tick
         touched_agent = False
         touched_opp = False
+        last_touched_orig_idx = None
         
+        # Include agents who successfully kicked the ball
+        for orig_idx in kicked_agents:
+            last_touched_orig_idx = orig_idx
+            is_our_agent = (orig_idx < self.n_agents)
+            if is_our_agent:
+                touched_agent = True
+            else:
+                touched_opp = True
+
         for i in range(n):
             for j in range(i + 1, n):
                 collided = _resolve_dd(all_discs[i], all_discs[j])
                 if collided:
-                    # Check if player hit the ball
+                    # Check if player hit the ball (ball is at index 0 in all_discs)
                     if (i == 0 and j > 0) or (j == 0 and i > 0):
-                        idx = max(i, j) - 1 # 0 for agent, 1 for opponent
-                        if idx == 0:
+                        disc_idx = max(i, j) - 1 # index in shuffled_agents
+                        actual_agent = shuffled_agents[disc_idx]
+                        orig_idx = self.agents.index(actual_agent)
+                        last_touched_orig_idx = orig_idx
+                        
+                        is_our_agent = (orig_idx < self.n_agents)
+                            
+                        if is_our_agent:
                             touched_agent = True
-                        elif idx == 1:
+                        else:
                             touched_opp = True
 
         if touched_agent and touched_opp:
-            # Both touched in same tick, ambiguous but let's favor the last one or None
-            # Standard is just to update who hit it. Let's say agent wins ties.
+            # Both touched in same tick, let's say agent wins ties.
             self.last_touch_this_tick = 'A'
         elif touched_agent:
             self.last_touch_this_tick = 'A'
@@ -754,6 +904,8 @@ class HaxballCurriculumEnv(gym.Env):
             self.last_touch_this_tick = 'O'
         else:
             self.last_touch_this_tick = None
+            
+        self.last_touch_idx_this_tick = last_touched_orig_idx
 
         # 4b. Goal Poles Collisions
         poles = [
@@ -885,30 +1037,85 @@ class HaxballCurriculumEnv(gym.Env):
         
         # In 1v1 (A0.1 / A1), there are no teammates. Teammate section remains 0.
         # Section 6 (Opponents) starts at index 25 + 4*9 = 61.
-        if len(self.agents) > 1:
-            opp = self.agents[1]
-            idx = 61
-            
+        # ── Teammates ──
+        tm_start_idx = 25
+        teammates = self.agents[1:self.n_agents]
+        for i, tm in enumerate(teammates):
+            if i >= N_TM: break
+            idx = tm_start_idx + i * 9
+            obs[idx] = flip * tm.x / NORM;                 idx += 1
+            obs[idx] = tm.y / NORM;                        idx += 1
+            obs[idx] = flip * tm.xs / MAX_SPEED;           idx += 1
+            obs[idx] = tm.ys / MAX_SPEED;                  idx += 1
+            obs[idx] = flip * (tm.x - mx) / NORM;          idx += 1
+            obs[idx] = (tm.y - my) / NORM;                 idx += 1
+            obs[idx] = flip * (bx - tm.x) / NORM;          idx += 1
+            obs[idx] = (by - tm.y) / NORM;                 idx += 1
+            tm_surf_dist = max(0.0, math.hypot(tm.x - bx, tm.y - by) - PLYR_R - BALL_R)
+            obs[idx] = tm_surf_dist / DIAG;                idx += 1
+
+        # ── Opponents ──
+        opp_start_idx = 25 + N_TM * 9 # 61
+        opponents = self.agents[self.n_agents:]
+        for i, opp in enumerate(opponents):
+            if i >= N_OPP: break
+            idx = opp_start_idx + i * 9
             obs[idx] = flip * opp.x / NORM;                 idx += 1
             obs[idx] = opp.y / NORM;                        idx += 1
             obs[idx] = flip * opp.xs / MAX_SPEED;           idx += 1
             obs[idx] = opp.ys / MAX_SPEED;                  idx += 1
-            
-            # d_to_me
             obs[idx] = flip * (opp.x - mx) / NORM;          idx += 1
             obs[idx] = (opp.y - my) / NORM;                 idx += 1
-            
-            # d_to_ball
             obs[idx] = flip * (bx - opp.x) / NORM;          idx += 1
             obs[idx] = (by - opp.y) / NORM;                 idx += 1
-            
-            # dist_to_ball (surface)
             opp_surf_dist = max(0.0, math.hypot(opp.x - bx, opp.y - by) - PLYR_R - BALL_R)
             obs[idx] = opp_surf_dist / DIAG;                idx += 1
 
+        # Append Advantage features at the very end (index 106 and 107)
+        if self.phase.startswith('A2'):
+            obs[106] = self.a2_adv / 5.0
+            obs[107] = self._get_num_opp_bypassed() / 5.0
+
+        # ── NEW GENERIC FEATURES (108 to 113) ──
+        my_dist_to_ball = math.hypot(mx - bx, my - by)
+        tm_idx = 108
+        tm_dists_to_ball = []
+        
+        # 1. Distances to all teammates
+        for i in range(N_TM):
+            if i < len(teammates):
+                tm = teammates[i]
+                obs[tm_idx] = math.hypot(mx - tm.x, my - tm.y) / DIAG
+                tm_dists_to_ball.append(math.hypot(tm.x - bx, tm.y - by))
+            else:
+                obs[tm_idx] = 0.0
+            tm_idx += 1
+            
+        # 2. Rank, Diff, and Nearest Teammate Dist
+        if not teammates:
+            obs[112] = 0.0
+            obs[113] = 0.0
+            obs[114] = 0.0
+        else:
+            rank = sum(1 for d in tm_dists_to_ball if d < my_dist_to_ball)
+            obs[112] = float(rank) / N_TM
+            
+            min_team_dist_to_ball = min(my_dist_to_ball, min(tm_dists_to_ball))
+            obs[113] = (my_dist_to_ball - min_team_dist_to_ball) / DIAG
+            
+            my_dists_to_tms = [math.hypot(mx - tm.x, my - tm.y) for tm in teammates]
+            obs[114] = min(my_dists_to_tms) / DIAG
+
         return obs
 
-    def _get_obs_for_opponent(self) -> np.ndarray:
+    def _get_obs_for_teammate(self) -> np.ndarray:
+        # Swap agents[0] and agents[1] (teammate)
+        self.agents[0], self.agents[1] = self.agents[1], self.agents[0]
+        obs_tm = self._get_obs()
+        self.agents[0], self.agents[1] = self.agents[1], self.agents[0]
+        return obs_tm
+
+    def _get_obs_for_opponent(self, opp_idx=1) -> np.ndarray:
         # Swap team context and return obs to opponent (for self play evaluation inside step)
         original_team = self.team_id
         # Swap explicitly
@@ -919,13 +1126,13 @@ class HaxballCurriculumEnv(gym.Env):
         self._flip = 1.0 if self.team_id == 1 else -1.0
         self._attack_sign = 1 if self.team_id == 1 else -1
         
-        # We also need to swap agents[0] and agents[1] for the perspective of `_get_obs`
-        self.agents[0], self.agents[1] = self.agents[1], self.agents[0]
+        # We also need to swap agents[0] and agents[opp_idx] for the perspective of `_get_obs`
+        self.agents[0], self.agents[opp_idx] = self.agents[opp_idx], self.agents[0]
         
         obs_opp = self._get_obs()
         
         # Revert
-        self.agents[0], self.agents[1] = self.agents[1], self.agents[0]
+        self.agents[0], self.agents[opp_idx] = self.agents[opp_idx], self.agents[0]
         self.team_id = original_team
         self._flip = old_flip
         self._attack_sign = old_attack
