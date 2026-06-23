@@ -23,10 +23,10 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-A1_MODEL_PATH      = "models/a1_final.zip"  # Agent chính
-OPPONENT_MODEL_PATH = "models/a1_checkpoints/snapshot_1000000.zip" # Opponent model (dùng khi OPPONENT='Trained')
+A1_MODEL_PATH      = "models/a1_fix_checkpoints/snapshot_2000000.zip"  # Agent chính
+OPPONENT_MODEL_PATH = "models/a1_checkpoints/snapshot_21000000.zip" # Opponent model (dùng khi OPPONENT='Trained')
 A0_MODEL_PATH = None
-OPPONENT = "Human"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
+OPPONENT = "Trained"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
 GOAL_SIZE = 64.0                        # Goal half-height in physics units
 DETERMINISTIC = True                    # Use deterministic policy actions
 
@@ -43,7 +43,66 @@ except ModuleNotFoundError:
     sys.exit(1)
 
 from stable_baselines3 import PPO
-from training.env import HaxballCurriculumEnv, DIR_MAP, KICK_STR, POLE_R, _dist_to_goal_segment
+from training.env import HaxballCurriculumEnv, DIR_MAP, KICK_STR, POLE_R, _dist_to_goal_segment, Disc, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP
+
+class PlayFixEnv(HaxballCurriculumEnv):
+    def _reset_positions(self):
+        super()._reset_positions()
+        
+        # 100% Own goal situation
+        own_goal_x = -self.HW * self._attack_sign
+        own_goal_y = float(self._rng.uniform(-self.goal_y, self.goal_y))
+        
+        # Mọi player được spawn ngẫu nhiên trong đúng nửa sân của mình
+        if self.team_id == 1:
+            # Agent is RED (Left half), Opp is BLUE (Right half)
+            ax = float(self._rng.uniform(-self.HW * 0.8 + PLYR_R, -PLYR_R))
+            ox = float(self._rng.uniform(PLYR_R, self.HW * 0.8 - PLYR_R))
+        else:
+            # Agent is BLUE (Right half), Opp is RED (Left half)
+            ax = float(self._rng.uniform(PLYR_R, self.HW * 0.8 - PLYR_R))
+            ox = float(self._rng.uniform(-self.HW * 0.8 + PLYR_R, -PLYR_R))
+            
+        ay = float(self._rng.uniform(-self.goal_y, self.goal_y))
+        oy = float(self._rng.uniform(-self.goal_y, self.goal_y))
+        
+        dx = own_goal_x - ax
+        dy = own_goal_y - ay
+        dist = math.hypot(dx, dy)
+        
+        if dist > 0:
+            ndx, ndy = dx / dist, dy / dist
+        else:
+            ndx, ndy = 1.0, 0.0
+            
+        gap = float(self._rng.uniform(0.5, 2.0))
+        b_dist = PLYR_R + BALL_R + gap
+        bx = ax + ndx * b_dist
+        by = ay + ndy * b_dist
+        
+        self.ball = Disc(bx, by, 0.0, 0.0, BALL_R, BALL_IMASS, BALL_BCOEF, BALL_DAMP)
+        
+        if self.team_id == 1:
+            self.agents = [
+                Disc(ax, ay, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP),
+                Disc(ox, oy, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)
+            ]
+        else:
+            self.agents = [
+                Disc(ax, ay, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP),
+                Disc(ox, oy, 0.0, 0.0, PLYR_R, PLYR_IMASS, PLYR_BCOEF, PLYR_DAMP)
+            ]
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = super().step(action)
+        
+        if terminated or truncated:
+            agent_score = self.scores[self.team_id - 1]
+            # Reduce goal reward from 30 to 10
+            if agent_score > 0:
+                reward -= 20.0
+                
+        return obs, reward, terminated, truncated, info
 
 # ── Display constants ──────────────────────────────────────────────────────────
 WIN_W      = 1000
@@ -276,6 +335,14 @@ def draw_panel(screen, env, step, ep_reward, step_reward, episode, total_eps,
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
+    try:
+        import numpy.core.numeric
+        sys.modules['numpy._core'] = sys.modules['numpy.core']
+        sys.modules['numpy._core.numeric'] = sys.modules['numpy.core.numeric']
+        sys.modules['numpy._core.multiarray'] = sys.modules.get('numpy.core.multiarray', sys.modules['numpy.core'])
+    except Exception:
+        pass
+
     print(f"Loading model: {A1_MODEL_PATH}")
     a1_model = PPO.load(A1_MODEL_PATH, device="cpu")
 
@@ -288,7 +355,7 @@ def main():
     # Field surface rect (below panel, with 5px margin)
     field_rect = pygame.Rect(5, PANEL_H + 5, WIN_W - 10, FIELD_H)
 
-    env = HaxballCurriculumEnv(phase="A1")
+    env = PlayFixEnv(phase="A1")
     if A0_MODEL_PATH:
         env.a0_model_path = A0_MODEL_PATH
 
