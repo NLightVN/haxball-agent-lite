@@ -30,10 +30,13 @@ PLAY_AS = "T1"                          # For A2v1/A2v2: 'T1', 'T2'
 A1_MODEL_PATH      = "models/a1_fix_checkpoints/snapshot_2000000.zip"  # Agent chính (A1)
 A1_OPP_MODEL_PATH  = "models/a1_checkpoints/snapshot_6000000.zip"      # Opponent model (A1)
 
-# A2v1/A2v2 configs
-A2_T1_MODEL_PATH   = r"models\a2_t1_checkpoints\snapshot_1000000.zip"
-A2_T2_MODEL_PATH   = r"models\a2_t1_checkpoints\snapshot_1000000.zip"
+# A2v1 configs
+A2_T1_MODEL_PATH   = r"models\a2v2_checkpoints\snapshot_500000.zip"
+A2_T2_MODEL_PATH   = r"models\a2_t2_checkpoints\snapshot_1000000.zip"
 A2_BASE_MODEL_PATH = "models/a2_base.zip" # Fallback if training not complete
+
+# A2v2 configs
+A2V2_MODEL_PATH    = r"models\a2v2_checkpoints\snapshot_500000.zip"
 
 OPPONENT = "Trained"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
 GOAL_SIZE = 64.0                        # Goal half-height in physics units
@@ -242,7 +245,8 @@ def draw_players(screen, env, surf_rect):
         else:
             # Opponent
             color = C_OPP if env.team_id == 1 else C_AGENT
-            label = OPP_LABEL if env.opponent_type == 'Trained' else (env.opponent_type[:3] if env.opponent_type else "BOT")
+            opp_type = env.opponent_type[i - env.n_agents] if isinstance(env.opponent_type, list) else env.opponent_type
+            label = OPP_LABEL if opp_type == 'Trained' else (opp_type[:3] if opp_type else "BOT")
 
         # Shadow
         shadow_surf = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
@@ -400,8 +404,8 @@ def main():
         n_agents = 2
         env = PlayFixEnv(phase="A2v2", n_agents=n_agents)
         
-        agent_path = A2_T1_MODEL_PATH if PLAY_AS == "T1" else A2_T2_MODEL_PATH
-        opp_path   = A2_T2_MODEL_PATH if PLAY_AS == "T1" else A2_T1_MODEL_PATH
+        agent_path = A2V2_MODEL_PATH
+        opp_path   = A2V2_MODEL_PATH
         
         if not os.path.exists(agent_path):
             print(f"WARNING: {agent_path} not found. Falling back to base model {A2_BASE_MODEL_PATH}")
@@ -537,7 +541,7 @@ def main():
             draw_players(screen, env, field_rect)
             draw_ball(screen, env, field_rect)
             draw_panel(screen, env, step_cnt, ep_reward, step_reward, episode, episode + 1,
-                       result_flash, False, env.opponent_type)
+                       result_flash, False, str(env.opponent_type))
             pygame.display.flip()
             clock.tick(RENDER_FPS)
             continue
@@ -548,7 +552,7 @@ def main():
             draw_players(screen, env, field_rect)
             draw_ball(screen, env, field_rect)
             draw_panel(screen, env, step_cnt, ep_reward, step_reward, episode, episode + 1,
-                       result_flash if now < flash_until else "", True, env.opponent_type)
+                       result_flash if now < flash_until else "", True, str(env.opponent_type))
             pygame.display.flip()
             clock.tick(RENDER_FPS)
             continue
@@ -580,7 +584,7 @@ def main():
         draw_players(screen, env, field_rect)
         draw_ball(screen, env, field_rect)
         draw_panel(screen, env, step_cnt, ep_reward, step_reward, episode, episode + 1,
-                   result_flash if now < flash_until else "", paused, env.opponent_type)
+                   result_flash if now < flash_until else "", paused, str(env.opponent_type))
         pygame.display.flip()
         clock.tick(RENDER_FPS)
 

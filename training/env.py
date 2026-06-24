@@ -449,7 +449,7 @@ class HaxballCurriculumEnv(gym.Env):
                 elif self.phase == 'A2.0':
                     self.episode_type = 'opponent'
                     self.goal_y = 64.0
-                    self.opponent_type = 'Trained' if self.forced_opponent_type is None else self.forced_opponent_type
+                    self.opponent_type = self.forced_opponent_type if isinstance(self.forced_opponent_type, list) else ('Trained' if self.forced_opponent_type is None else self.forced_opponent_type)
                     
                     our_sign = self._attack_sign
                     our_x_min = -self.HW * 0.85 + PLYR_R if our_sign == 1 else PLYR_R
@@ -481,7 +481,7 @@ class HaxballCurriculumEnv(gym.Env):
                 elif self.phase == 'A2v2':
                     self.episode_type = 'opponent'
                     self.goal_y = 64.0
-                    self.opponent_type = 'Trained' if self.forced_opponent_type is None else self.forced_opponent_type
+                    self.opponent_type = self.forced_opponent_type if isinstance(self.forced_opponent_type, list) else ('Trained' if self.forced_opponent_type is None else self.forced_opponent_type)
                     
                     our_sign = self._attack_sign
                     our_x_min = -self.HW * 0.85 + PLYR_R if our_sign == 1 else PLYR_R
@@ -630,7 +630,8 @@ class HaxballCurriculumEnv(gym.Env):
                         agent_actions.append(self._get_bot_action(self.opponent_type, 2))
                 else:
                     # Opponent 1 (agents[1])
-                    if self.opponent_type == 'Human':
+                    opp1_type = self.opponent_type[0] if isinstance(self.opponent_type, list) else self.opponent_type
+                    if opp1_type == 'Human':
                         agent_actions.append(self.human_opponent_action)
                     elif self.opponent_policy is not None:
                         opp_obs = self._get_obs_for_opponent(opp_idx=1)
@@ -639,9 +640,10 @@ class HaxballCurriculumEnv(gym.Env):
                         opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
                         agent_actions.append((opp_dx * (-self._flip), opp_dy, int(opp_action[1])))
                     else:
-                        agent_actions.append(self._get_bot_action(self.opponent_type, 1))
+                        agent_actions.append(self._get_bot_action(opp1_type, 1))
                         
                     # Opponent 2 (agents[2])
+                    opp2_type = self.opponent_type[1] if isinstance(self.opponent_type, list) else self.opponent_type
                     if self.opponent_policy is not None:
                         opp_obs = self._get_obs_for_opponent(opp_idx=2)
                         expected_shape = self.opponent_policy.observation_space.shape[0]
@@ -649,7 +651,7 @@ class HaxballCurriculumEnv(gym.Env):
                         opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
                         agent_actions.append((opp_dx * (-self._flip), opp_dy, int(opp_action[1])))
                     else:
-                        agent_actions.append(self._get_bot_action(self.opponent_type, 2))
+                        agent_actions.append(self._get_bot_action(opp2_type, 2))
             elif self.phase == 'A2v2':
                 # Teammate (agents[1])
                 if hasattr(self, 'teammate_policy') and self.teammate_policy is not None:
@@ -662,7 +664,8 @@ class HaxballCurriculumEnv(gym.Env):
                     agent_actions.append((0.0, 0.0, 0))
                     
                 # Opponent 1 (agents[2])
-                if self.opponent_type == 'Human':
+                opp1_type = self.opponent_type[0] if isinstance(self.opponent_type, list) else self.opponent_type
+                if opp1_type == 'Human':
                     agent_actions.append(self.human_opponent_action)
                 elif self.opponent_policy is not None:
                     opp_obs = self._get_obs_for_opponent(opp_idx=2)
@@ -671,9 +674,10 @@ class HaxballCurriculumEnv(gym.Env):
                     opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
                     agent_actions.append((opp_dx * (-self._flip), opp_dy, int(opp_action[1])))
                 else:
-                    agent_actions.append(self._get_bot_action(self.opponent_type, 2))
+                    agent_actions.append(self._get_bot_action(opp1_type, 2))
                     
                 # Opponent 2 (agents[3])
+                opp2_type = self.opponent_type[1] if isinstance(self.opponent_type, list) else self.opponent_type
                 if self.opponent_policy is not None:
                     opp_obs = self._get_obs_for_opponent(opp_idx=3)
                     expected_shape = self.opponent_policy.observation_space.shape[0]
@@ -681,7 +685,7 @@ class HaxballCurriculumEnv(gym.Env):
                     opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
                     agent_actions.append((opp_dx * (-self._flip), opp_dy, int(opp_action[1])))
                 else:
-                    agent_actions.append(self._get_bot_action(self.opponent_type, 3))
+                    agent_actions.append(self._get_bot_action(opp2_type, 3))
             else:
                 if self.opponent_type == 'Defender':
                     agent_actions.append(self._get_defender_action())

@@ -86,9 +86,7 @@ class SelfPlayManagerCallback(BaseCallback):
         files = glob.glob(pattern)
         
         bot_types = ['Pazzo', 'Wanderer', 'Defender', 'Attacker']
-        chosen_bots = np.random.choice(bot_types, 2, replace=False)
-        
-        valid_checkpoints = [(0, chosen_bots[0]), (0, chosen_bots[1])]
+        valid_checkpoints = [(0, "BOTS")]
         for f in files:
             m = re.search(r'snapshot_(\d+)\.zip$', f)
             if m:
@@ -98,7 +96,7 @@ class SelfPlayManagerCallback(BaseCallback):
         T = max(1_000_000.0, 16_000_000.0 * (1.0 - step_now / self.total_steps) ** 2)
         
         if len(valid_checkpoints) == 1:
-            sampled_idx = 0
+            probs = [1.0]
         else:
             steps, paths = zip(*valid_checkpoints)
             steps = np.array(steps)
@@ -107,27 +105,32 @@ class SelfPlayManagerCallback(BaseCallback):
             probs = np.exp(-diffs / T)
             probs /= np.sum(probs)
             
-            sampled_idx = np.random.choice(len(paths), p=probs)
-            
-        sampled_step = valid_checkpoints[sampled_idx][0]
-        sampled_path = valid_checkpoints[sampled_idx][1]
+        loaded_models = {}
+        log_messages = []
         
-        if sampled_step != self.current_opponent_step or sampled_path in bot_types:
+        for i in range(self.training_env.num_envs):
+            sampled_idx = 0 if len(valid_checkpoints) == 1 else np.random.choice(len(valid_checkpoints), p=probs)
+            sampled_step = valid_checkpoints[sampled_idx][0]
+            sampled_path = valid_checkpoints[sampled_idx][1]
+            
             try:
-                if sampled_path in bot_types:
-                    self.training_env.set_attr('forced_opponent_type', sampled_path)
-                    self.training_env.set_attr('opponent_policy', None)
-                    if self.verbose:
-                        log.info(f"[{self.team_name}] [Self-Play] Loaded Bot '{sampled_path}' as opponent (T={T:.0f})")
+                if sampled_path == "BOTS":
+                    chosen_bots = np.random.choice(bot_types, 2, replace=False).tolist()
+                    self.training_env.set_attr('forced_opponent_type', chosen_bots, indices=[i])
+                    self.training_env.set_attr('opponent_policy', None, indices=[i])
+                    log_messages.append(f"Env {i}: Bots {chosen_bots}")
                 else:
-                    opp_model = PPO.load(sampled_path, custom_objects={"device": "cpu"})
-                    self.training_env.set_attr('forced_opponent_type', 'Trained')
-                    self.training_env.set_attr('opponent_policy', opp_model)
-                    if self.verbose:
-                        log.info(f"[{self.team_name}] [Self-Play] Loaded opponent from step {sampled_step} (T={T:.0f})")
-                self.current_opponent_step = sampled_step
+                    if sampled_path not in loaded_models:
+                        loaded_models[sampled_path] = PPO.load(sampled_path, custom_objects={"device": "cpu"})
+                    
+                    self.training_env.set_attr('forced_opponent_type', ['Trained', 'Trained'], indices=[i])
+                    self.training_env.set_attr('opponent_policy', loaded_models[sampled_path], indices=[i])
+                    log_messages.append(f"Env {i}: Step {sampled_step}")
             except Exception as e:
-                log.info(f"[{self.team_name}] [Self-Play] ❌ Error loading opponent: {e}")
+                log.info(f"[{self.team_name}] [Self-Play] ❌ Error loading opponent for Env {i}: {e}")
+                
+        if self.verbose:
+            log.info(f"[{self.team_name}] [Self-Play] Rolled opponents (T={T:.0f}) -> {', '.join(log_messages)}")
 
     def _on_step(self) -> bool:
         return True
@@ -137,7 +140,6 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--base-model", default="models/a2_t1_checkpoints/snapshot_1000000.zip", help="Path to initial expanded model")
     p.add_argument("--steps",    default=30_000_000,  type=int)
-    p.add_argument("--chunk-steps", default=250_000, type=int, help="Steps per alternating training chunk")
     return p.parse_args()
 
 
@@ -153,87 +155,53 @@ if __name__ == "__main__":
     except Exception:
         pass
 
-    os.makedirs("models/a2_t1_checkpoints", exist_ok=True) # Team 1 (2 players)
-    os.makedirs("models/a2_t2_checkpoints", exist_ok=True) # Team 2 (1 player)
+    os.makedirs("models/a2v2_checkpoints", exist_ok=True) # Symmetrical Self-Play directory
 
-    # Đảm bảo snapshot_1000000.zip có trong pool của T2 (T1 đã có do path mặc định)
+    # Đảm bảo snapshot_1000000.zip có trong pool của a2v2_checkpoints
     import shutil
     if os.path.exists(args.base_model):
-        t2_target = "models/a2_t2_checkpoints/snapshot_1000000.zip"
-        if args.base_model != t2_target and not os.path.exists(t2_target):
-            shutil.copy(args.base_model, t2_target)
-            log.info(f"Copied {args.base_model} to {t2_target}")
+        a2v2_target = "models/a2v2_checkpoints/snapshot_1.zip"
+        if args.base_model != a2v2_target and not os.path.exists(a2v2_target):
+            shutil.copy(args.base_model, a2v2_target)
+            log.info(f"Copied {args.base_model} to {a2v2_target}")
     else:
         log.warning(f"Base model {args.base_model} not found. Training from scratch.")
 
-    def make_env_t1():
-        # Env for training T1 (n_agents=2). 
-        # Opponent policy will be set by SelfPlayManagerCallback
-        return HaxballCurriculumEnv(phase='A2.0', n_agents=2)
-        
-    def make_env_t2():
-        # Env for training T2 (n_agents=1).
-        # Opponent policy will be set by SelfPlayManagerCallback
-        return HaxballCurriculumEnv(phase='A2.0', n_agents=1)
+    def make_env():
+        # Env for Symmetrical Self-Play (A2v2, 2vs2).
+        return HaxballCurriculumEnv(phase='A2v2', n_agents=2)
 
-    vec_env_t1 = DummyVecEnv([make_env_t1 for _ in range(N_ENVS)])
-    vec_env_t1 = VecMonitor(vec_env_t1)
+    vec_env = DummyVecEnv([make_env for _ in range(N_ENVS)])
+    vec_env = VecMonitor(vec_env)
     
-    vec_env_t2 = DummyVecEnv([make_env_t2 for _ in range(N_ENVS)])
-    vec_env_t2 = VecMonitor(vec_env_t2)
-
     log.info(f"Loading initial weights from {args.base_model}")
     if os.path.exists(args.base_model):
-        model_t1 = PPO.load(args.base_model, env=vec_env_t1, custom_objects=PPO_PARAMS)
-        model_t2 = PPO.load(args.base_model, env=vec_env_t2, custom_objects=PPO_PARAMS)
+        model = PPO.load(args.base_model, env=vec_env, custom_objects=PPO_PARAMS)
+        model.num_timesteps = 0  # Force restart from step 0 for A2v2
+        log.info("Model loaded. Starting A2v2 training from step 0.")
     else:
-        model_t1 = PPO("MlpPolicy", vec_env_t1, **PPO_PARAMS)
-        model_t2 = PPO("MlpPolicy", vec_env_t2, **PPO_PARAMS)
+        model = PPO("MlpPolicy", vec_env, **PPO_PARAMS)
         
-    model_t1.set_env(vec_env_t1)
-    model_t2.set_env(vec_env_t2)
+    model.set_env(vec_env)
 
-    # Set initial teammate policy for T1 envs dynamically so it uses the current model_t1 weights
-    for env in vec_env_t1.envs:
-        env.teammate_policy = model_t1
+    # Set initial teammate policy dynamically so it uses the current model weights
+    for env in vec_env.envs:
+        env.teammate_policy = model
 
-    # Callbacks for T1 (Trains against T2's checkpoints)
-    t1_ckpt_cb = DynamicCheckpointCallback("T1", "models/a2_t1_checkpoints", verbose=1)
-    t1_opp_cb  = SelfPlayManagerCallback("T1", "models/a2_t2_checkpoints", args.steps, verbose=1)
-
-    # Callbacks for T2 (Trains against T1's checkpoints)
-    t2_ckpt_cb = DynamicCheckpointCallback("T2", "models/a2_t2_checkpoints", verbose=1)
-    t2_opp_cb  = SelfPlayManagerCallback("T2", "models/a2_t1_checkpoints", args.steps, verbose=1)
+    ckpt_cb = DynamicCheckpointCallback("A2v2", "models/a2v2_checkpoints", verbose=1)
+    opp_cb  = SelfPlayManagerCallback("A2v2", "models/a2v2_checkpoints", args.steps, verbose=1)
 
     total_steps = args.steps
-    chunk = args.chunk_steps
     
-    log.info(f"Starting Alternating Training: {total_steps:,} steps total. Chunk size: {chunk:,}")
+    log.info(f"Starting Symmetrical Self-Play Training: {total_steps:,} steps total.")
     
-    while model_t1.num_timesteps < total_steps or model_t2.num_timesteps < total_steps:
-        # Train T1 (Team 1, 2 players)
-        log.info(f"\n--- Training T1 (Step {model_t1.num_timesteps:,} / {total_steps:,}) ---")
-        for env in vec_env_t1.envs:
-            env.teammate_policy = model_t1
-        
-        model_t1.learn(
-            total_timesteps=chunk,
-            callback=[t1_ckpt_cb, t1_opp_cb],
-            reset_num_timesteps=False,
-            log_interval=10,
-            progress_bar=True,
-        )
-        model_t1.save("models/a2_t1_final")
-        
-        # Train T2 (Team 2, 1 player)
-        log.info(f"\n--- Training T2 (Step {model_t2.num_timesteps:,} / {total_steps:,}) ---")
-        model_t2.learn(
-            total_timesteps=chunk,
-            callback=[t2_ckpt_cb, t2_opp_cb],
-            reset_num_timesteps=False,
-            log_interval=10,
-            progress_bar=True,
-        )
-        model_t2.save("models/a2_t2_final")
-
-    log.info("Finished Alternating Training!")
+    model.learn(
+        total_timesteps=total_steps,
+        callback=[ckpt_cb, opp_cb],
+        reset_num_timesteps=False,
+        log_interval=10,
+        progress_bar=True,
+    )
+    
+    model.save("models/a2v2_final")
+    log.info("Finished Symmetrical Self-Play Training!")
