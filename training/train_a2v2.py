@@ -62,7 +62,13 @@ class DynamicCheckpointCallback(BaseCallback):
 
         if self.num_timesteps >= self.next_save_step:
             path = os.path.join(self.save_path, f"snapshot_{self.next_save_step}")
+            
+            # Temporary fix for Numpy 2.0 RecursionError during pickling
+            env = self.model.env
+            self.model.env = None
             self.model.save(path)
+            self.model.env = env
+            
             if self.verbose:
                 log.info(f"[{self.team_name}] 💾 Dynamic Checkpoint: Saved model to {path}.zip")
             
