@@ -120,8 +120,13 @@ class SelfPlayManagerCallback(BaseCallback):
                     self.training_env.set_attr('opponent_policy', None, indices=[i])
                     log_messages.append(f"Env {i}: Bots {chosen_bots}")
                 else:
+                    custom_objs = {
+                        "observation_space": self.training_env.observation_space,
+                        "action_space": self.training_env.action_space,
+                        "device": "cpu"
+                    }
                     if sampled_path not in loaded_models:
-                        loaded_models[sampled_path] = PPO.load(sampled_path, custom_objects={"device": "cpu"})
+                        loaded_models[sampled_path] = PPO.load(sampled_path, custom_objects=custom_objs)
                     
                     self.training_env.set_attr('forced_opponent_type', ['Trained', 'Trained'], indices=[i])
                     self.training_env.set_attr('opponent_policy', loaded_models[sampled_path], indices=[i])
@@ -176,7 +181,12 @@ if __name__ == "__main__":
     
     log.info(f"Loading initial weights from {args.base_model}")
     if os.path.exists(args.base_model):
-        model = PPO.load(args.base_model, env=vec_env, custom_objects=PPO_PARAMS)
+        custom_objs = {
+            "observation_space": vec_env.observation_space,
+            "action_space": vec_env.action_space,
+            **PPO_PARAMS
+        }
+        model = PPO.load(args.base_model, env=vec_env, custom_objects=custom_objs)
         m = re.search(r'snapshot_(\d+)\.zip$', args.base_model)
         if m:
             step = int(m.group(1))
