@@ -36,7 +36,7 @@ A2_T2_MODEL_PATH   = r"models\a2_t2_checkpoints\snapshot_1000000.zip"
 A2_BASE_MODEL_PATH = "models/a2_base.zip" # Fallback if training not complete
 
 # A2v2 configs
-A2V2_MODEL_PATH    = r"models\a2v2_checkpoints\snapshot_500000.zip"
+A2V2_MODEL_PATH    = r"models\a2v2_checkpoints\snapshot_5700000.zip"
 
 OPPONENT = "Trained"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
 GOAL_SIZE = 64.0                        # Goal half-height in physics units
@@ -401,11 +401,11 @@ def main():
             env.opponent_policy = PPO.load(opp_path, device="cpu")
             
     else: # A2v2
-        n_agents = 2
+        n_agents = 1
         env = PlayFixEnv(phase="A2v2", n_agents=n_agents)
         
         agent_path = A2V2_MODEL_PATH
-        opp_path   = A2V2_MODEL_PATH
+        opp_path   = r"models\a2v2_checkpoints\snapshot_1100000.zip"
         
         if not os.path.exists(agent_path):
             print(f"WARNING: {agent_path} not found. Falling back to base model {A2_BASE_MODEL_PATH}")
