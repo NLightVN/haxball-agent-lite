@@ -177,8 +177,17 @@ if __name__ == "__main__":
     log.info(f"Loading initial weights from {args.base_model}")
     if os.path.exists(args.base_model):
         model = PPO.load(args.base_model, env=vec_env, custom_objects=PPO_PARAMS)
-        model.num_timesteps = 0  # Force restart from step 0 for A2v2
-        log.info("Model loaded. Starting A2v2 training from step 0.")
+        m = re.search(r'snapshot_(\d+)\.zip$', args.base_model)
+        if m:
+            step = int(m.group(1))
+            if step == 1 or step == 1000000:
+                model.num_timesteps = 0  # Force restart from step 0 for A2v2 fresh start
+                log.info("Model loaded. Starting A2v2 training from step 0.")
+            else:
+                model.num_timesteps = step
+                log.info(f"Model loaded. Resuming A2v2 training from step {step:,}.")
+        else:
+            model.num_timesteps = 0
     else:
         model = PPO("MlpPolicy", vec_env, **PPO_PARAMS)
         
