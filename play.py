@@ -23,16 +23,16 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-MODE = "A2v1"                           # "A1" | "A2v1"
-PLAY_AS = "T1"                          # For A2v1: 'T1' (Play as Team 1 - 2 players), 'T2' (Play as Team 2 - 1 player)
+MODE = "A2v2"                           # "A1" | "A2v1" | "A2v2"
+PLAY_AS = "T1"                          # For A2v1/A2v2: 'T1', 'T2'
 
 # A1 configs
 A1_MODEL_PATH      = "models/a1_fix_checkpoints/snapshot_2000000.zip"  # Agent chính (A1)
 A1_OPP_MODEL_PATH  = "models/a1_checkpoints/snapshot_6000000.zip"      # Opponent model (A1)
 
-# A2v1 configs
+# A2v1/A2v2 configs
 A2_T1_MODEL_PATH   = r"models\a2_t1_checkpoints\snapshot_1000000.zip"
-A2_T2_MODEL_PATH   = r"models\a2_t2_checkpoints\snapshot_1000000.zip"
+A2_T2_MODEL_PATH   = r"models\a2_t1_checkpoints\snapshot_1000000.zip"
 A2_BASE_MODEL_PATH = "models/a2_base.zip" # Fallback if training not complete
 
 OPPONENT = "Trained"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
@@ -66,8 +66,8 @@ class PlayFixEnv(HaxballCurriculumEnv):
     def _reset_positions(self):
         super()._reset_positions()
         
-        # In A2v1, just use the parent's default positioning (random across full half)
-        if self.phase == 'A2.0':
+        # In A2v1/A2v2, just use the parent's default positioning (random across full half)
+        if self.phase in ('A2.0', 'A2v2'):
             return
             
         # 100% Own goal situation (A1 only)
@@ -235,7 +235,7 @@ def draw_players(screen, env, surf_rect):
             # Agent: determine colour by team
             color = C_AGENT if env.team_id == 1 else C_OPP
             label = AGENT_LABEL
-        elif env.phase == 'A2.0' and env.n_agents == 2 and i == 1:
+        elif env.phase in ('A2.0', 'A2v2') and env.n_agents == 2 and i == 1:
             # Teammate
             color = C_AGENT if env.team_id == 1 else C_OPP
             label = "TM"
@@ -372,7 +372,7 @@ def main():
             print(f"Loading opponent model: {A1_OPP_MODEL_PATH}")
             env.opponent_policy = PPO.load(A1_OPP_MODEL_PATH, device="cpu")
             
-    else: # A2v1
+    elif MODE == "A2v1":
         n_agents = 2 if PLAY_AS == "T1" else 1
         env = PlayFixEnv(phase="A2.0", n_agents=n_agents)
         
@@ -391,6 +391,29 @@ def main():
         
         if n_agents == 2:
             env.teammate_policy = main_model
+            
+        if OPPONENT.lower() == "trained":
+            print(f"Loading opponent model: {opp_path}")
+            env.opponent_policy = PPO.load(opp_path, device="cpu")
+            
+    else: # A2v2
+        n_agents = 2
+        env = PlayFixEnv(phase="A2v2", n_agents=n_agents)
+        
+        agent_path = A2_T1_MODEL_PATH if PLAY_AS == "T1" else A2_T2_MODEL_PATH
+        opp_path   = A2_T2_MODEL_PATH if PLAY_AS == "T1" else A2_T1_MODEL_PATH
+        
+        if not os.path.exists(agent_path):
+            print(f"WARNING: {agent_path} not found. Falling back to base model {A2_BASE_MODEL_PATH}")
+            agent_path = A2_BASE_MODEL_PATH
+        if not os.path.exists(opp_path):
+            print(f"WARNING: {opp_path} not found. Falling back to base model {A2_BASE_MODEL_PATH}")
+            opp_path = A2_BASE_MODEL_PATH
+            
+        print(f"Loading main agent model: {agent_path}")
+        main_model = PPO.load(agent_path, device="cpu")
+        
+        env.teammate_policy = main_model
             
         if OPPONENT.lower() == "trained":
             print(f"Loading opponent model: {opp_path}")
