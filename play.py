@@ -23,8 +23,8 @@ import numpy as np
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-MODE = "A2v2"                           # "A1" | "A2v1" | "A2v2"
-PLAY_AS = "T1"                          # For A2v1/A2v2: 'T1', 'T2'
+MODE = "A2v2"                           # "A1" | "A2v1" | "A2v2" | "A2.3"
+PLAY_AS = "T1"                          # For A2v1/A2v2/A2.3: 'T1', 'T2'
 
 # A1 configs
 A1_MODEL_PATH      = "models/a1_fix_checkpoints/snapshot_2000000.zip"  # Agent chính (A1)
@@ -36,17 +36,23 @@ A2_T2_MODEL_PATH   = r"models\a2_t2_checkpoints\snapshot_1000000.zip"
 A2_BASE_MODEL_PATH = "models/a2_base.zip" # Fallback if training not complete
 
 # A2v2 configs
-A2V2_MODEL_PATH    = r"models\a2v2_checkpoints\snapshot_5700000.zip"
+A2V2_MODEL_PATH    = r"models\a2.3_checkpoints\snapshot_3800000.zip"
+
+# A2.3 configs
+A2_3_MODEL_PATH    = r"models\a2.3_checkpoints\snapshot_3800000.zip"
 
 OPPONENT = "Trained"                      # Defender | Attacker | Hybrid | Follower | Trained | Random | Human
 GOAL_SIZE = 64.0                        # Goal half-height in physics units
-DETERMINISTIC = True                    # Use deterministic policy actions
+DETERMINISTIC = False                  # Use deterministic policy actions
 
 # Display labels (auto-derived from model paths)
 _stem = lambda p: os.path.splitext(os.path.basename(p))[0] if p else None
 if MODE == "A1":
     AGENT_LABEL = _stem(A1_MODEL_PATH) or "A1"
     OPP_LABEL   = _stem(A1_OPP_MODEL_PATH) or "OPP"
+elif MODE == "A2.3":
+    AGENT_LABEL = "A2.3"
+    OPP_LABEL = "A2.3"
 else:
     if PLAY_AS == "T1":
         AGENT_LABEL = "A2_T1"
@@ -400,12 +406,36 @@ def main():
             print(f"Loading opponent model: {opp_path}")
             env.opponent_policy = PPO.load(opp_path, device="cpu")
             
+    elif MODE == "A2.3":
+        n_agents = 2
+        env = PlayFixEnv(phase="A2v2", n_agents=n_agents)
+        env.forced_map_type = 'large'
+        
+        agent_path = A2_3_MODEL_PATH
+        opp_path   = A2_3_MODEL_PATH
+        
+        if not os.path.exists(agent_path):
+            print(f"WARNING: {agent_path} not found. Falling back to base model {A2_BASE_MODEL_PATH}")
+            agent_path = A2_BASE_MODEL_PATH
+        if not os.path.exists(opp_path):
+            print(f"WARNING: {opp_path} not found. Falling back to base model {A2_BASE_MODEL_PATH}")
+            opp_path = A2_BASE_MODEL_PATH
+            
+        print(f"Loading main agent model: {agent_path}")
+        main_model = PPO.load(agent_path, device="cpu")
+        
+        env.teammate_policy = main_model
+            
+        if OPPONENT.lower() == "trained":
+            print(f"Loading opponent model: {opp_path}")
+            env.opponent_policy = PPO.load(opp_path, device="cpu")
+
     else: # A2v2
-        n_agents = 1
+        n_agents = 2
         env = PlayFixEnv(phase="A2v2", n_agents=n_agents)
         
         agent_path = A2V2_MODEL_PATH
-        opp_path   = r"models\a2v2_checkpoints\snapshot_1100000.zip"
+        opp_path   = r"models\a2.3_checkpoints\snapshot_3800000.zip"
         
         if not os.path.exists(agent_path):
             print(f"WARNING: {agent_path} not found. Falling back to base model {A2_BASE_MODEL_PATH}")
@@ -440,6 +470,7 @@ def main():
         elif opp_lower not in ("random", "none", "solo"):
             env.forced_opponent_type = OPPONENT
 
+    env.deterministic_opponents = DETERMINISTIC
     is_human_opp = OPPONENT and OPPONENT.lower() == "human"
 
     # ── Helper: read human opponent keyboard input ────────────────────────────

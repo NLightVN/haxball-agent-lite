@@ -266,8 +266,13 @@ class HaxballCurriculumEnv(gym.Env):
         return sum(1 for opp in opps if (self.ball.x - opp.x) * atk > 0)
 
     def _reset_positions(self):
-        size_class = '1v1'
-        cands = [p for p in MAP_PRESETS if p[3] == size_class] or MAP_PRESETS
+        size_class = getattr(self, 'forced_map_type', '1v1')
+        if size_class == 'small':
+            cands = [MAP_PRESETS[0]]
+        elif size_class == 'large':
+            cands = [MAP_PRESETS[1]]
+        else:
+            cands = [p for p in MAP_PRESETS if p[3] == size_class] or MAP_PRESETS
         preset = cands[int(self._rng.integers(0, len(cands)))]
         
         if self.phase == 'A0':
@@ -448,7 +453,7 @@ class HaxballCurriculumEnv(gym.Env):
                     
                 elif self.phase == 'A2.0':
                     self.episode_type = 'opponent'
-                    self.goal_y = 64.0
+                    self.goal_y = float(preset[2])
                     self.opponent_type = self.forced_opponent_type if isinstance(self.forced_opponent_type, list) else ('Trained' if self.forced_opponent_type is None else self.forced_opponent_type)
                     
                     our_sign = self._attack_sign
@@ -480,7 +485,7 @@ class HaxballCurriculumEnv(gym.Env):
 
                 elif self.phase == 'A2v2':
                     self.episode_type = 'opponent'
-                    self.goal_y = 64.0
+                    self.goal_y = float(preset[2])
                     self.opponent_type = self.forced_opponent_type if isinstance(self.forced_opponent_type, list) else ('Trained' if self.forced_opponent_type is None else self.forced_opponent_type)
                     
                     our_sign = self._attack_sign
@@ -623,7 +628,7 @@ class HaxballCurriculumEnv(gym.Env):
                     elif self.opponent_policy is not None:
                         opp_obs = self._get_obs_for_opponent(opp_idx=2)
                         expected_shape = self.opponent_policy.observation_space.shape[0]
-                        opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=False)
+                        opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=getattr(self, 'deterministic_opponents', False))
                         opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
                         agent_actions.append((opp_dx * (-self._flip), opp_dy, int(opp_action[1])))
                     else:
@@ -636,7 +641,7 @@ class HaxballCurriculumEnv(gym.Env):
                     elif self.opponent_policy is not None:
                         opp_obs = self._get_obs_for_opponent(opp_idx=1)
                         expected_shape = self.opponent_policy.observation_space.shape[0]
-                        opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=False)
+                        opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=getattr(self, 'deterministic_opponents', False))
                         opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
                         agent_actions.append((opp_dx * (-self._flip), opp_dy, int(opp_action[1])))
                     else:
@@ -647,7 +652,7 @@ class HaxballCurriculumEnv(gym.Env):
                     if self.opponent_policy is not None:
                         opp_obs = self._get_obs_for_opponent(opp_idx=2)
                         expected_shape = self.opponent_policy.observation_space.shape[0]
-                        opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=False)
+                        opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=getattr(self, 'deterministic_opponents', False))
                         opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
                         agent_actions.append((opp_dx * (-self._flip), opp_dy, int(opp_action[1])))
                     else:
@@ -657,7 +662,7 @@ class HaxballCurriculumEnv(gym.Env):
                 if hasattr(self, 'teammate_policy') and self.teammate_policy is not None:
                     tm_obs = self._get_obs_for_teammate()
                     expected_shape = self.teammate_policy.observation_space.shape[0]
-                    tm_action, _ = self.teammate_policy.predict(tm_obs[:expected_shape], deterministic=False)
+                    tm_action, _ = self.teammate_policy.predict(tm_obs[:expected_shape], deterministic=getattr(self, 'deterministic_opponents', False))
                     tm_dx, tm_dy = DIR_MAP[int(tm_action[0])]
                     agent_actions.append((tm_dx * self._flip, tm_dy, int(tm_action[1])))
                 else:
@@ -670,7 +675,7 @@ class HaxballCurriculumEnv(gym.Env):
                 elif self.opponent_policy is not None:
                     opp_obs = self._get_obs_for_opponent(opp_idx=2)
                     expected_shape = self.opponent_policy.observation_space.shape[0]
-                    opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=False)
+                    opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=getattr(self, 'deterministic_opponents', False))
                     opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
                     agent_actions.append((opp_dx * (-self._flip), opp_dy, int(opp_action[1])))
                 else:
@@ -681,7 +686,7 @@ class HaxballCurriculumEnv(gym.Env):
                 if self.opponent_policy is not None:
                     opp_obs = self._get_obs_for_opponent(opp_idx=3)
                     expected_shape = self.opponent_policy.observation_space.shape[0]
-                    opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=False)
+                    opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=getattr(self, 'deterministic_opponents', False))
                     opp_dx, opp_dy = DIR_MAP[int(opp_action[0])]
                     agent_actions.append((opp_dx * (-self._flip), opp_dy, int(opp_action[1])))
                 else:
@@ -705,7 +710,7 @@ class HaxballCurriculumEnv(gym.Env):
                     # Build obs from opponent's perspective
                     opp_obs = self._get_obs_for_opponent()
                     expected_shape = self.opponent_policy.observation_space.shape[0]
-                    opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=False)
+                    opp_action, _ = self.opponent_policy.predict(opp_obs[:expected_shape], deterministic=getattr(self, 'deterministic_opponents', False))
                     opp_dir_idx = int(opp_action[0])
                     opp_kick = int(opp_action[1])
                     opp_dx, opp_dy = DIR_MAP[opp_dir_idx]

@@ -1,0 +1,106 @@
+2026-06-24 08:32:18 [INFO] Logger initialised — writing to e:\haxball-agent-lite\models\a2v2_train\training.log
+2026-06-24 08:32:18 [INFO] Loading initial weights from models/a2_t1_checkpoints/snapshot_1000000.zip
+2026-06-24 08:32:20 [INFO] Starting Alternating Training: 30,000,000 steps total. Chunk size: 250,000
+2026-06-24 08:32:20 [INFO] 
+--- Training T1 (Step 1,000,000 / 30,000,000) ---
+2026-06-24 08:32:20 [INFO] [T1] [Self-Play] Loaded Bot 'Wanderer' as opponent (T=14951111)
+2026-06-24 08:32:20 [INFO] [T1] 💾 Dynamic Checkpoint: Saved model to models/a2_t1_checkpoints\snapshot_500000.zip
+2026-06-24 08:37:12 [INFO] Logger initialised — writing to e:\haxball-agent-lite\models\a2v2_train\training.log
+2026-06-24 08:37:12 [INFO] Copied models/a2_t1_checkpoints/snapshot_1000000.zip to models/a2v2_checkpoints/snapshot_1000000.zip
+2026-06-24 08:37:12 [INFO] Loading initial weights from models/a2_t1_checkpoints/snapshot_1000000.zip
+2026-06-24 08:37:14 [INFO] Starting Symmetrical Self-Play Training: 30,000,000 steps total.
+2026-06-24 08:37:14 [INFO] [A2v2] [Self-Play] Loaded Bot 'Wanderer' as opponent (T=14951111)
+2026-06-24 08:37:14 [INFO] [A2v2] 💾 Dynamic Checkpoint: Saved model to models/a2v2_checkpoints\snapshot_500000.zip
+2026-06-24 08:37:26 [INFO] [A2v2] [Self-Play] Loaded Bot 'Wanderer' as opponent (T=14934222)
+2026-06-24 08:37:38 [INFO] [A2v2] [Self-Play] Loaded Bot 'Pazzo' as opponent (T=14917343)
+2026-06-24 08:37:49 [INFO] [A2v2] [Self-Play] Loaded Bot 'Attacker' as opponent (T=14900473)
+2026-06-24 08:38:01 [INFO] [A2v2] [Self-Play] Loaded opponent from step 500000 (T=14883613)
+2026-06-24 08:46:10 [INFO] Logger initialised — writing to e:\haxball-agent-lite\models\a2v2_train\training.log
+2026-06-24 08:46:10 [INFO] Copied models/a2_t1_checkpoints/snapshot_1000000.zip to models/a2v2_checkpoints/snapshot_1.zip
+2026-06-24 08:46:10 [INFO] Loading initial weights from models/a2_t1_checkpoints/snapshot_1000000.zip
+2026-06-24 08:46:12 [INFO] Model loaded. Starting A2v2 training from step 0.
+2026-06-24 08:46:12 [INFO] Starting Symmetrical Self-Play Training: 30,000,000 steps total.
+2026-06-24 08:46:12 [INFO] [A2v2] [Self-Play] Loaded Bot 'Pazzo' as opponent (T=14951111)
+2026-06-24 08:46:12 [INFO] [A2v2] 💾 Dynamic Checkpoint: Saved model to models/a2v2_checkpoints\snapshot_500000.zip
+2026-06-24 08:46:23 [INFO] [A2v2] [Self-Play] Loaded opponent from step 1 (T=14934222)
+2026-06-24 08:46:45 [INFO] [A2v2] [Self-Play] Loaded Bot 'Defender' as opponent (T=14917343)
+2026-06-24 08:46:57 [INFO] [A2v2] [Self-Play] Loaded opponent from step 1 (T=14900473)
+2026-06-24 08:51:39 [INFO] Logger initialised — writing to e:\haxball-agent-lite\models\a2v2_train\training.log
+2026-06-24 08:51:39 [INFO] Loading initial weights from models/a2_t1_checkpoints/snapshot_1000000.zip
+2026-06-24 08:51:40 [INFO] Model loaded. Starting A2v2 training from step 0.
+2026-06-24 08:51:40 [INFO] Starting Symmetrical Self-Play Training: 30,000,000 steps total.
+2026-06-24 08:51:40 [INFO] [A2v2] [Self-Play] Loaded opponent from step 1 (T=16000000)
+2026-06-24 08:52:01 [INFO] [A2v2] [Self-Play] Loaded Bots ['Pazzo', 'Wanderer'] as opponent (T=15982529)
+2026-06-24 08:52:13 [INFO] [A2v2] [Self-Play] Loaded Bots ['Attacker', 'Pazzo'] as opponent (T=15965067)
+2026-06-24 08:52:25 [INFO] [A2v2] [Self-Play] Loaded opponent from step 1 (T=15947614)
+2026-06-24 08:52:46 [INFO] [A2v2] [Self-Play] Loaded Bots ['Pazzo', 'Defender'] as opponent (T=15930171)
+2026-06-24 08:52:58 [INFO] [A2v2] [Self-Play] Loaded Bots ['Wanderer', 'Pazzo'] as opponent (T=15912738)
+2026-06-24 08:53:09 [INFO] [A2v2] [Self-Play] Loaded opponent from step 1 (T=15895314)
+2026-06-24 08:54:53 [INFO] Logger initialised — writing to e:\haxball-agent-lite\models\a2v2_train\training.log
+2026-06-24 08:54:53 [INFO] Loading initial weights from models/a2_t1_checkpoints/snapshot_1000000.zip
+2026-06-24 08:54:54 [INFO] Model loaded. Starting A2v2 training from step 0.
+2026-06-24 08:54:54 [INFO] Starting Symmetrical Self-Play Training: 30,000,000 steps total.
+2026-06-24 08:54:54 [INFO] [A2v2] [Self-Play] Rolled opponents (T=16000000) -> Env 0: Step 1, Env 1: Bots ['Wanderer', 'Pazzo'], Env 2: Step 1, Env 3: Bots ['Defender', 'Wanderer'], Env 4: Bots ['Attacker', 'Defender'], Env 5: Bots ['Wanderer', 'Pazzo'], Env 6: Bots ['Defender', 'Wanderer'], Env 7: Bots ['Wanderer', 'Defender']
+2026-06-24 08:55:06 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15982529) -> Env 0: Step 1, Env 1: Step 1, Env 2: Step 1, Env 3: Bots ['Wanderer', 'Defender'], Env 4: Step 1, Env 5: Step 1, Env 6: Step 1, Env 7: Bots ['Pazzo', 'Defender']
+2026-06-24 08:55:19 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15965067) -> Env 0: Bots ['Pazzo', 'Wanderer'], Env 1: Bots ['Pazzo', 'Wanderer'], Env 2: Step 1, Env 3: Bots ['Attacker', 'Defender'], Env 4: Bots ['Attacker', 'Wanderer'], Env 5: Step 1, Env 6: Step 1, Env 7: Step 1
+2026-06-24 08:55:31 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15947614) -> Env 0: Bots ['Wanderer', 'Pazzo'], Env 1: Bots ['Defender', 'Wanderer'], Env 2: Bots ['Attacker', 'Defender'], Env 3: Bots ['Pazzo', 'Defender'], Env 4: Step 1, Env 5: Step 1, Env 6: Step 1, Env 7: Step 1
+2026-06-24 08:55:43 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15930171) -> Env 0: Step 1, Env 1: Step 1, Env 2: Step 1, Env 3: Bots ['Wanderer', 'Defender'], Env 4: Bots ['Attacker', 'Defender'], Env 5: Step 1, Env 6: Bots ['Pazzo', 'Wanderer'], Env 7: Bots ['Defender', 'Attacker']
+2026-06-24 08:55:56 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15912738) -> Env 0: Bots ['Pazzo', 'Defender'], Env 1: Step 1, Env 2: Step 1, Env 3: Step 1, Env 4: Step 1, Env 5: Bots ['Pazzo', 'Attacker'], Env 6: Step 1, Env 7: Bots ['Defender', 'Attacker']
+2026-06-24 08:56:08 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15895314) -> Env 0: Step 1, Env 1: Step 1, Env 2: Step 1, Env 3: Bots ['Pazzo', 'Defender'], Env 4: Bots ['Wanderer', 'Defender'], Env 5: Bots ['Pazzo', 'Wanderer'], Env 6: Bots ['Attacker', 'Wanderer'], Env 7: Step 1
+2026-06-24 08:56:21 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15877900) -> Env 0: Step 1, Env 1: Bots ['Wanderer', 'Defender'], Env 2: Bots ['Attacker', 'Defender'], Env 3: Step 1, Env 4: Bots ['Wanderer', 'Pazzo'], Env 5: Step 1, Env 6: Bots ['Defender', 'Wanderer'], Env 7: Bots ['Attacker', 'Pazzo']
+2026-06-24 08:56:33 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15860495) -> Env 0: Step 1, Env 1: Bots ['Wanderer', 'Attacker'], Env 2: Step 1, Env 3: Step 1, Env 4: Step 1, Env 5: Step 1, Env 6: Bots ['Pazzo', 'Defender'], Env 7: Bots ['Defender', 'Wanderer']
+2026-06-24 08:56:46 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15843100) -> Env 0: Step 1, Env 1: Step 1, Env 2: Bots ['Attacker', 'Pazzo'], Env 3: Step 1, Env 4: Step 1, Env 5: Step 1, Env 6: Step 1, Env 7: Bots ['Defender', 'Wanderer']
+2026-06-24 08:57:00 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15825715) -> Env 0: Step 1, Env 1: Step 1, Env 2: Step 1, Env 3: Step 1, Env 4: Step 1, Env 5: Step 1, Env 6: Bots ['Wanderer', 'Defender'], Env 7: Step 1
+2026-06-24 08:57:12 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15808339) -> Env 0: Bots ['Attacker', 'Defender'], Env 1: Step 1, Env 2: Bots ['Wanderer', 'Attacker'], Env 3: Bots ['Defender', 'Wanderer'], Env 4: Step 1, Env 5: Bots ['Wanderer', 'Attacker'], Env 6: Bots ['Attacker', 'Wanderer'], Env 7: Step 1
+2026-06-24 08:57:24 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15790972) -> Env 0: Step 1, Env 1: Step 1, Env 2: Bots ['Pazzo', 'Wanderer'], Env 3: Bots ['Pazzo', 'Attacker'], Env 4: Step 1, Env 5: Step 1, Env 6: Step 1, Env 7: Bots ['Attacker', 'Wanderer']
+2026-06-24 08:57:37 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15773615) -> Env 0: Step 1, Env 1: Step 1, Env 2: Bots ['Wanderer', 'Pazzo'], Env 3: Step 1, Env 4: Step 1, Env 5: Step 1, Env 6: Bots ['Attacker', 'Wanderer'], Env 7: Bots ['Defender', 'Attacker']
+2026-06-24 08:57:49 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15756268) -> Env 0: Bots ['Defender', 'Attacker'], Env 1: Bots ['Attacker', 'Defender'], Env 2: Step 1, Env 3: Bots ['Attacker', 'Pazzo'], Env 4: Bots ['Wanderer', 'Defender'], Env 5: Step 1, Env 6: Bots ['Attacker', 'Wanderer'], Env 7: Bots ['Defender', 'Wanderer']
+2026-06-24 08:58:02 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15738930) -> Env 0: Bots ['Wanderer', 'Attacker'], Env 1: Step 1, Env 2: Step 1, Env 3: Step 1, Env 4: Step 1, Env 5: Bots ['Pazzo', 'Wanderer'], Env 6: Bots ['Defender', 'Wanderer'], Env 7: Step 1
+2026-06-24 08:58:14 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15721601) -> Env 0: Step 1, Env 1: Bots ['Defender', 'Attacker'], Env 2: Bots ['Attacker', 'Wanderer'], Env 3: Step 1, Env 4: Step 1, Env 5: Step 1, Env 6: Step 1, Env 7: Step 1
+2026-06-24 08:58:27 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15704283) -> Env 0: Step 1, Env 1: Bots ['Defender', 'Wanderer'], Env 2: Bots ['Defender', 'Attacker'], Env 3: Bots ['Defender', 'Wanderer'], Env 4: Bots ['Wanderer', 'Defender'], Env 5: Step 1, Env 6: Bots ['Pazzo', 'Defender'], Env 7: Step 1
+2026-06-24 08:58:39 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15686973) -> Env 0: Step 1, Env 1: Bots ['Pazzo', 'Attacker'], Env 2: Step 1, Env 3: Bots ['Attacker', 'Pazzo'], Env 4: Bots ['Wanderer', 'Defender'], Env 5: Step 1, Env 6: Bots ['Pazzo', 'Wanderer'], Env 7: Bots ['Defender', 'Attacker']
+2026-06-24 08:58:51 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15669674) -> Env 0: Step 1, Env 1: Bots ['Defender', 'Wanderer'], Env 2: Bots ['Defender', 'Wanderer'], Env 3: Bots ['Defender', 'Attacker'], Env 4: Bots ['Wanderer', 'Defender'], Env 5: Bots ['Wanderer', 'Defender'], Env 6: Bots ['Attacker', 'Wanderer'], Env 7: Step 1
+2026-06-24 08:59:03 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15652384) -> Env 0: Step 1, Env 1: Bots ['Defender', 'Pazzo'], Env 2: Bots ['Attacker', 'Wanderer'], Env 3: Bots ['Defender', 'Wanderer'], Env 4: Bots ['Defender', 'Attacker'], Env 5: Bots ['Attacker', 'Wanderer'], Env 6: Bots ['Attacker', 'Wanderer'], Env 7: Bots ['Attacker', 'Wanderer']
+2026-06-24 08:59:15 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15635103) -> Env 0: Bots ['Defender', 'Attacker'], Env 1: Bots ['Attacker', 'Pazzo'], Env 2: Step 1, Env 3: Bots ['Attacker', 'Wanderer'], Env 4: Step 1, Env 5: Bots ['Attacker', 'Pazzo'], Env 6: Step 1, Env 7: Bots ['Wanderer', 'Attacker']
+2026-06-24 08:59:27 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15617832) -> Env 0: Step 1, Env 1: Bots ['Pazzo', 'Defender'], Env 2: Bots ['Attacker', 'Wanderer'], Env 3: Step 1, Env 4: Bots ['Defender', 'Pazzo'], Env 5: Bots ['Pazzo', 'Attacker'], Env 6: Bots ['Wanderer', 'Pazzo'], Env 7: Step 1
+2026-06-24 08:59:39 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15600570) -> Env 0: Step 1, Env 1: Step 1, Env 2: Step 1, Env 3: Step 1, Env 4: Bots ['Pazzo', 'Wanderer'], Env 5: Step 1, Env 6: Step 1, Env 7: Step 1
+2026-06-24 08:59:52 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15583318) -> Env 0: Bots ['Wanderer', 'Defender'], Env 1: Step 1, Env 2: Step 1, Env 3: Step 1, Env 4: Step 1, Env 5: Bots ['Attacker', 'Wanderer'], Env 6: Bots ['Pazzo', 'Wanderer'], Env 7: Step 1
+2026-06-24 09:00:04 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15566076) -> Env 0: Bots ['Defender', 'Wanderer'], Env 1: Step 1, Env 2: Step 1, Env 3: Bots ['Defender', 'Attacker'], Env 4: Step 1, Env 5: Step 1, Env 6: Bots ['Pazzo', 'Wanderer'], Env 7: Step 1
+2026-06-24 09:00:16 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15548843) -> Env 0: Bots ['Pazzo', 'Attacker'], Env 1: Bots ['Defender', 'Wanderer'], Env 2: Bots ['Attacker', 'Defender'], Env 3: Step 1, Env 4: Bots ['Attacker', 'Pazzo'], Env 5: Bots ['Defender', 'Wanderer'], Env 6: Step 1, Env 7: Bots ['Wanderer', 'Attacker']
+2026-06-24 09:00:28 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15531620) -> Env 0: Bots ['Attacker', 'Defender'], Env 1: Step 1, Env 2: Step 1, Env 3: Step 1, Env 4: Bots ['Attacker', 'Wanderer'], Env 5: Bots ['Attacker', 'Defender'], Env 6: Bots ['Pazzo', 'Defender'], Env 7: Bots ['Pazzo', 'Attacker']
+2026-06-24 09:00:40 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15514406) -> Env 0: Step 1, Env 1: Step 1, Env 2: Bots ['Attacker', 'Pazzo'], Env 3: Step 1, Env 4: Bots ['Wanderer', 'Attacker'], Env 5: Step 1, Env 6: Bots ['Attacker', 'Pazzo'], Env 7: Bots ['Defender', 'Wanderer']
+2026-06-24 09:00:52 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15497202) -> Env 0: Bots ['Attacker', 'Defender'], Env 1: Step 1, Env 2: Bots ['Wanderer', 'Attacker'], Env 3: Step 1, Env 4: Bots ['Wanderer', 'Defender'], Env 5: Step 1, Env 6: Bots ['Attacker', 'Defender'], Env 7: Bots ['Wanderer', 'Pazzo']
+2026-06-24 09:01:03 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15480007) -> Env 0: Step 1, Env 1: Step 1, Env 2: Step 1, Env 3: Bots ['Defender', 'Pazzo'], Env 4: Bots ['Attacker', 'Defender'], Env 5: Bots ['Pazzo', 'Wanderer'], Env 6: Bots ['Pazzo', 'Wanderer'], Env 7: Step 1
+2026-06-24 09:01:09 [INFO] [A2v2] 💾 Dynamic Checkpoint: Saved model to models/a2v2_checkpoints\snapshot_500000.zip
+2026-06-24 09:01:16 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15462822) -> Env 0: Step 1, Env 1: Step 500000, Env 2: Bots ['Defender', 'Attacker'], Env 3: Bots ['Pazzo', 'Wanderer'], Env 4: Bots ['Defender', 'Pazzo'], Env 5: Step 500000, Env 6: Step 500000, Env 7: Step 1
+2026-06-24 09:25:25 [INFO] Logger initialised — writing to e:\haxball-agent-lite\models\a2v2_train\training.log
+2026-06-24 09:25:25 [INFO] Loading initial weights from models/a2_t1_checkpoints/snapshot_1000000.zip
+2026-06-24 09:25:26 [INFO] Model loaded. Starting A2v2 training from step 0.
+2026-06-24 09:25:26 [INFO] Starting Symmetrical Self-Play Training: 30,000,000 steps total.
+2026-06-24 09:25:26 [INFO] [A2v2] [Self-Play] Rolled opponents (T=16000000) -> Env 0: Step 1, Env 1: Step 500000, Env 2: Step 500000, Env 3: Step 500000, Env 4: Step 1, Env 5: Step 1, Env 6: Step 1, Env 7: Step 1
+2026-06-24 09:25:41 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15982529) -> Env 0: Bots ['Attacker', 'Pazzo'], Env 1: Bots ['Attacker', 'Pazzo'], Env 2: Step 1, Env 3: Bots ['Wanderer', 'Defender'], Env 4: Step 500000, Env 5: Step 500000, Env 6: Step 500000, Env 7: Bots ['Wanderer', 'Attacker']
+2026-06-24 12:45:16 [INFO] Logger initialised — writing to e:\haxball-agent-lite\models\a2v2_train\training.log
+2026-06-24 12:45:16 [INFO] Loading initial weights from models/a2_t1_checkpoints/snapshot_1000000.zip
+2026-06-24 12:45:18 [INFO] Model loaded. Starting A2v2 training from step 0.
+2026-06-24 12:45:18 [INFO] Starting Symmetrical Self-Play Training: 30,000,000 steps total.
+2026-06-24 12:45:18 [INFO] [A2v2] [Self-Play] Rolled opponents (T=16000000) -> Env 0: Step 1, Env 1: Bots ['Defender', 'Attacker'], Env 2: Step 1, Env 3: Bots ['Pazzo', 'Defender'], Env 4: Bots ['Pazzo', 'Defender'], Env 5: Step 1, Env 6: Step 1, Env 7: Bots ['Defender', 'Attacker']
+2026-06-24 12:45:37 [INFO] Logger initialised — writing to e:\haxball-agent-lite\models\a2v2_train\training.log
+2026-06-24 12:45:37 [INFO] Loading initial weights from models/a2_t1_checkpoints/snapshot_1000000.zip
+2026-06-24 12:45:39 [INFO] Model loaded. Starting A2v2 training from step 0.
+2026-06-24 12:45:39 [INFO] Starting Symmetrical Self-Play Training: 30,000,000 steps total.
+2026-06-24 12:45:39 [INFO] [A2v2] [Self-Play] Rolled opponents (T=16000000) -> Env 0: Step 1, Env 1: Bots ['Pazzo', 'Attacker'], Env 2: Bots ['Pazzo', 'Wanderer'], Env 3: Bots ['Defender', 'Attacker'], Env 4: Bots ['Attacker', 'Defender'], Env 5: Step 1, Env 6: Step 1, Env 7: Step 1
+2026-06-24 12:45:51 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15982529) -> Env 0: Bots ['Attacker', 'Defender'], Env 1: Step 1, Env 2: Step 1, Env 3: Bots ['Defender', 'Wanderer'], Env 4: Step 1, Env 5: Step 1, Env 6: Bots ['Pazzo', 'Wanderer'], Env 7: Bots ['Defender', 'Attacker']
+2026-06-24 12:50:42 [INFO] Logger initialised — writing to e:\haxball-agent-lite\models\a2v2_train\training.log
+2026-06-24 12:50:42 [INFO] Loading initial weights from models/a2_t1_checkpoints/snapshot_1000000.zip
+2026-06-24 12:50:43 [INFO] Model loaded. Starting A2v2 training from step 0.
+2026-06-24 12:50:43 [INFO] Starting Symmetrical Self-Play Training: 30,000,000 steps total.
+2026-06-24 12:50:43 [INFO] [A2v2] [Self-Play] Rolled opponents (T=16000000) -> Env 0: Bots ['Wanderer', 'Attacker'], Env 1: Bots ['Pazzo', 'Defender'], Env 2: Step 500000, Env 3: Step 1, Env 4: Step 1, Env 5: Step 1, Env 6: Bots ['Defender', 'Pazzo'], Env 7: Bots ['Wanderer', 'Attacker']
+2026-06-24 12:50:56 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15982529) -> Env 0: Bots ['Wanderer', 'Attacker'], Env 1: Step 500000, Env 2: Step 500000, Env 3: Bots ['Pazzo', 'Attacker'], Env 4: Step 1, Env 5: Step 1, Env 6: Step 1, Env 7: Step 1
+2026-06-24 12:51:08 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15965067) -> Env 0: Step 1, Env 1: Step 500000, Env 2: Bots ['Defender', 'Attacker'], Env 3: Step 500000, Env 4: Bots ['Attacker', 'Defender'], Env 5: Step 500000, Env 6: Step 500000, Env 7: Step 500000
+2026-06-24 12:51:44 [INFO] Logger initialised — writing to e:\haxball-agent-lite\models\a2v2_train\training.log
+2026-06-24 12:51:44 [INFO] Loading initial weights from models/a2_t1_checkpoints/snapshot_1000000.zip
+2026-06-24 12:51:45 [INFO] Model loaded. Starting A2v2 training from step 0.
+2026-06-24 12:51:45 [INFO] Starting Symmetrical Self-Play Training: 30,000,000 steps total.
+2026-06-24 12:51:45 [INFO] [A2v2] [Self-Play] Rolled opponents (T=16000000) -> Env 0: Bots ['Pazzo', 'Wanderer'], Env 1: Step 1, Env 2: Bots ['Pazzo', 'Wanderer'], Env 3: Bots ['Pazzo', 'Attacker'], Env 4: Bots ['Defender', 'Pazzo'], Env 5: Step 1, Env 6: Step 1, Env 7: Bots ['Attacker', 'Pazzo']
+2026-06-24 12:51:58 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15982529) -> Env 0: Step 1, Env 1: Step 1, Env 2: Bots ['Pazzo', 'Wanderer'], Env 3: Bots ['Pazzo', 'Defender'], Env 4: Bots ['Attacker', 'Defender'], Env 5: Bots ['Pazzo', 'Attacker'], Env 6: Bots ['Defender', 'Attacker'], Env 7: Bots ['Pazzo', 'Attacker']
+2026-06-24 12:52:10 [INFO] [A2v2] [Self-Play] Rolled opponents (T=15965067) -> Env 0: Bots ['Wanderer', 'Defender'], Env 1: Bots ['Wanderer', 'Pazzo'], Env 2: Step 1, Env 3: Bots ['Pazzo', 'Wanderer'], Env 4: Bots ['Wanderer', 'Defender'], Env 5: Bots ['Pazzo', 'Defender'], Env 6: Bots ['Pazzo', 'Wanderer'], Env 7: Bots ['Pazzo', 'Defender']
