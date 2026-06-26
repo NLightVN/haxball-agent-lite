@@ -6,3 +6,5 @@ game_min_dev.js
 recordings/
 .vscode/
 bash.exe.stackdump
+.gitignore
+utils/
